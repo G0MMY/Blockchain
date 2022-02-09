@@ -5,11 +5,13 @@ import (
 )
 
 func main() {
-	var chain []components.Block
-	var blockchain components.Blockchain = components.Blockchain{Chain: chain}
-	blockchain.Chain = components.AddBlock(blockchain)
-	blockchain.Chain = components.AddBlock(blockchain)
-	blockchain.Chain = components.AddBlock(blockchain)
-	blockchain.Chain = components.AddBlock(blockchain)
-	components.DisplayBlockchain(blockchain)
+	var chain []*components.BlockType
+	var blockchain components.Blockchain
+	blockchain = &components.BlockchainType{Chain: chain, Length: 0}
+	blockchain.AddGenesisBlock()
+	blockchain.AddBlock()
+	blockchain.AddBlock()
+	blockchain.AddBlock()
+	blockchain.AddBlock()
+	blockchain.DisplayBlockchain()
 }

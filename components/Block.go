@@ -1,40 +1,55 @@
 package components
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"strconv"
-	"strings"
+	"time"
 )
 
-type Block struct {
-	index        int
-	nonce        int
-	timestamp    int64
-	PreviousHash string
-	CurrentHash  string
+type BlockType struct {
+	Nonce        int
+	Timestamp    int64
+	PreviousHash []byte
+	CurrentHash  []byte
+	Height       int
 }
 
-func VerifyHash(block Block) bool {
-	if hash(block.index, block.nonce, block.timestamp, block.PreviousHash) != block.CurrentHash {
-		return false
+type Block interface {
+	CheckBlock() bool
+}
+
+func (block *BlockType) CheckBlock() bool {
+	if fmt.Sprintf("%x", hash(block.Nonce, block)) == fmt.Sprintf("%x", block.CurrentHash) {
+		return true
 	}
-	return true
+	return false
 }
 
-func MineBlock(index int, nonce int, timestamp int64, previousHash string) Block {
-	var t = hash(index, nonce, timestamp, previousHash)
-	for t[0:2] != "00" {
-		nonce += 1
-		t = hash(index, nonce, timestamp, previousHash)
+func CreateBlock(previousHash []byte, height int) *BlockType {
+	block := &BlockType{0, time.Now().Unix(), previousHash, []byte{}, height}
+	ProofOfWork(block)
+	return block
+}
+
+func ProofOfWork(block *BlockType) {
+	i := 0
+	stringhash := fmt.Sprintf("%x", hash(i, block))
+	for stringhash[0:4] != "0000" {
+		i += 1
+		stringhash = fmt.Sprintf("%x", hash(i, block))
 	}
-	return Block{index, nonce, timestamp, previousHash, t}
+	block.Nonce = i
+	block.CurrentHash = hash(i, block)
 }
 
-func hash(index int, nonce int, timestamp int64, previousHash string) string {
-	hasher := sha256.New()
-	hasher.Write([]byte(strconv.Itoa(index) + strconv.Itoa(nonce) + strconv.Itoa(int(timestamp)) + previousHash))
-	var result string = fmt.Sprintf("%d", hasher.Sum(nil))
-	result = strings.ReplaceAll(result, " ", "")
-	return result[1:(len(result) - 1)]
+func hash(nonce int, block *BlockType) []byte {
+	info := bytes.Join([][]byte{
+		[]byte(fmt.Sprintf("%x", nonce)),
+		[]byte(fmt.Sprintf("%x", block.Timestamp)),
+		block.PreviousHash,
+	}, []byte{})
+	hash := sha256.Sum256(info)
+
+	return hash[:]
 }
