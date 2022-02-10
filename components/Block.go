@@ -10,6 +10,7 @@ import (
 type BlockType struct {
 	Nonce        int
 	Timestamp    int64
+	Transactions []*TransactionType
 	PreviousHash []byte
 	CurrentHash  []byte
 	Height       int
@@ -26,8 +27,14 @@ func (block *BlockType) CheckBlock() bool {
 	return false
 }
 
-func CreateBlock(previousHash []byte, height int) *BlockType {
-	block := &BlockType{0, time.Now().Unix(), previousHash, []byte{}, height}
+func CreateBlock(previousHash []byte, transactions []*TransactionType, height int) *BlockType {
+	i := 0
+	var usedTransactions []*TransactionType
+	for i < height && i < len(transactions) {
+		usedTransactions = append(usedTransactions, transactions[i])
+		i += 1
+	}
+	block := &BlockType{0, time.Now().Unix(), usedTransactions, previousHash, []byte{}, height}
 	ProofOfWork(block)
 	return block
 }

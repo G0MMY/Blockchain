@@ -5,8 +5,9 @@ import (
 )
 
 type BlockchainType struct {
-	Chain  []*BlockType
-	Length int
+	Chain   []*BlockType
+	Length  int
+	MemPool MemPool
 }
 
 type Blockchain interface {
@@ -16,6 +17,7 @@ type Blockchain interface {
 	GetLength() int
 	GetChain() []*BlockType
 	IsChainValid() bool
+	AddTransaction(string, string, int, int)
 }
 
 func (blockchain *BlockchainType) IsChainValid() bool {
@@ -31,6 +33,10 @@ func (blockchain *BlockchainType) IsChainValid() bool {
 	return true
 }
 
+func (blockchain *BlockchainType) AddTransaction(sender string, receiver string, amount int, fee int) {
+	blockchain.MemPool.addTransaction(CreateTransaction(sender, receiver, amount, fee))
+}
+
 func (blockchain *BlockchainType) GetChain() []*BlockType {
 	return blockchain.Chain
 }
@@ -40,13 +46,15 @@ func (blockchain *BlockchainType) GetLength() int {
 }
 
 func (blockchain *BlockchainType) AddGenesisBlock() {
-	block := CreateBlock([]byte{0}, 0)
+	block := CreateBlock([]byte{0}, blockchain.MemPool.getTransactions(), 0)
 	blockchain.Chain = append(blockchain.Chain, block)
 	blockchain.Length += 1
 }
 
 func (blockchain *BlockchainType) AddBlock() {
-	block := CreateBlock(blockchain.Chain[blockchain.Length-1].CurrentHash, 10)
+	height := 5
+	block := CreateBlock(blockchain.Chain[blockchain.Length-1].CurrentHash, blockchain.MemPool.getTransactions(), height)
+	blockchain.MemPool.deleteNFirstTransactions(height)
 	blockchain.Chain = append(blockchain.Chain, block)
 	blockchain.Length += 1
 }
