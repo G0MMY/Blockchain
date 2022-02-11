@@ -5,12 +5,8 @@ import (
 )
 
 func main() {
-	var chain []*components.BlockType
-	var blockchain components.Blockchain
-	var transactions []*components.TransactionType
-	var memPool = &components.MemPoolType{transactions, "01", 0}
-	blockchain = &components.BlockchainType{Chain: chain, Length: 0, MemPool: memPool}
-	blockchain.AddGenesisBlock()
+	blockchain := components.InitializeBlockchain()
+
 	blockchain.AddBlock()
 
 	blockchain.AddTransaction("me", "me", 150, 10)
@@ -28,4 +24,7 @@ func main() {
 
 	blockchain.AddBlock()
 	blockchain.AddBlock()
+
+	blockchain.AddTransaction("me", "me", 106, 1)
+	blockchain.AddTransaction("me", "me", 102, 50)
 }

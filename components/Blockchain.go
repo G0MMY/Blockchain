@@ -20,6 +20,16 @@ type Blockchain interface {
 	AddTransaction(string, string, int, int)
 }
 
+func InitializeBlockchain() *BlockchainType {
+	var chain []*BlockType
+	var transactions []*TransactionType
+	var memPool = &MemPoolType{transactions, "01", 0}
+	blockchain := &BlockchainType{Chain: chain, Length: 0, MemPool: memPool}
+	blockchain.AddGenesisBlock()
+
+	return blockchain
+}
+
 func (blockchain *BlockchainType) IsChainValid() bool {
 	i := 0
 	for i < blockchain.Length-1 {
@@ -46,9 +56,11 @@ func (blockchain *BlockchainType) GetLength() int {
 }
 
 func (blockchain *BlockchainType) AddGenesisBlock() {
-	block := CreateBlock([]byte{0}, blockchain.MemPool.getTransactions(), 0)
-	blockchain.Chain = append(blockchain.Chain, block)
-	blockchain.Length += 1
+	if blockchain.Length == 0 {
+		block := CreateBlock([]byte{0}, blockchain.MemPool.getTransactions(), 0)
+		blockchain.Chain = append(blockchain.Chain, block)
+		blockchain.Length += 1
+	}
 }
 
 func (blockchain *BlockchainType) AddBlock() {

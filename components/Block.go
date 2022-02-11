@@ -8,12 +8,12 @@ import (
 )
 
 type BlockType struct {
-	Nonce        int
-	Timestamp    int64
-	Transactions []*TransactionType
-	PreviousHash []byte
-	CurrentHash  []byte
-	Height       int
+	Nonce                 int
+	Timestamp             int64
+	Transactions          []*TransactionType
+	PreviousHash          []byte
+	CurrentHash           []byte
+	MaxNumberTransactions int
 }
 
 type Block interface {
@@ -27,14 +27,14 @@ func (block *BlockType) CheckBlock() bool {
 	return false
 }
 
-func CreateBlock(previousHash []byte, transactions []*TransactionType, height int) *BlockType {
+func CreateBlock(previousHash []byte, transactions []*TransactionType, maxNumberTransactions int) *BlockType {
 	i := 0
 	var usedTransactions []*TransactionType
-	for i < height && i < len(transactions) {
+	for i < maxNumberTransactions && i < len(transactions) {
 		usedTransactions = append(usedTransactions, transactions[i])
 		i += 1
 	}
-	block := &BlockType{0, time.Now().Unix(), usedTransactions, previousHash, []byte{}, height}
+	block := &BlockType{0, time.Now().Unix(), usedTransactions, previousHash, []byte{}, maxNumberTransactions}
 	ProofOfWork(block)
 	return block
 }

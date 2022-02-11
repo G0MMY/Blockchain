@@ -35,7 +35,7 @@ func (memPool *MemPoolType) deleteNFirstTransactions(quantity int) {
 		memPool.Transactions = transactions
 		memPool.NumberTransaction = 0
 	} else {
-		memPool.Transactions = memPool.Transactions[quantity-1:]
+		memPool.Transactions = memPool.Transactions[quantity:]
 		memPool.NumberTransaction -= quantity
 	}
 }
