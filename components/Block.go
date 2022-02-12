@@ -8,12 +8,12 @@ import (
 )
 
 type BlockType struct {
-	Nonce                 int
-	Timestamp             int64
-	Transactions          []*TransactionType
-	PreviousHash          []byte
-	CurrentHash           []byte
-	MaxNumberTransactions int
+	Nonce     int   `json:"nonce"`
+	Timestamp int64 `json:"timestamp" gorm:"primaryKey"`
+	//Transactions          []*TransactionType
+	PreviousHash          []byte `json:"previousHash"`
+	CurrentHash           []byte `json:"currentHash"`
+	MaxNumberTransactions int    `json:"maxNumberTransactions"`
 }
 
 type Block interface {
@@ -34,7 +34,7 @@ func CreateBlock(previousHash []byte, transactions []*TransactionType, maxNumber
 		usedTransactions = append(usedTransactions, transactions[i])
 		i += 1
 	}
-	block := &BlockType{0, time.Now().Unix(), usedTransactions, previousHash, []byte{}, maxNumberTransactions}
+	block := &BlockType{0, time.Now().Unix(), previousHash, []byte{}, maxNumberTransactions}
 	ProofOfWork(block)
 	return block
 }
