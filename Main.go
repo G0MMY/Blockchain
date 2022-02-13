@@ -36,7 +36,8 @@ func main() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/block", h.GetBlocks).Methods(http.MethodGet)
-	router.HandleFunc("/addBlock", h.AddBlock).Methods(http.MethodPost)
+	router.HandleFunc("/addBlock", h.AddBlock).Methods(http.MethodGet)
+	router.HandleFunc("/addGenesisBlock", h.AddGenesisBlock).Methods(http.MethodGet)
 
 	log.Println("running")
 	http.ListenAndServe(":4000", router)

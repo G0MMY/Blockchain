@@ -8,8 +8,9 @@ import (
 )
 
 type BlockType struct {
+	Id        int   `json:"Id" gorm:"primaryKey"`
 	Nonce     int   `json:"nonce"`
-	Timestamp int64 `json:"timestamp" gorm:"primaryKey"`
+	Timestamp int64 `json:"timestamp"`
 	//Transactions          []*TransactionType
 	PreviousHash          []byte `json:"previousHash"`
 	CurrentHash           []byte `json:"currentHash"`
@@ -27,14 +28,20 @@ func (block *BlockType) CheckBlock() bool {
 	return false
 }
 
-func CreateBlock(previousHash []byte, transactions []*TransactionType, maxNumberTransactions int) *BlockType {
-	i := 0
-	var usedTransactions []*TransactionType
-	for i < maxNumberTransactions && i < len(transactions) {
-		usedTransactions = append(usedTransactions, transactions[i])
-		i += 1
-	}
-	block := &BlockType{0, time.Now().Unix(), previousHash, []byte{}, maxNumberTransactions}
+//func CreateBlock(previousHash []byte, transactions []*TransactionType, maxNumberTransactions int) *BlockType {
+//	i := 0
+//	var usedTransactions []*TransactionType
+//	for i < maxNumberTransactions && i < len(transactions) {
+//		usedTransactions = append(usedTransactions, transactions[i])
+//		i += 1
+//	}
+//	block := &BlockType{0, time.Now().Unix(), usedTransactions, previousHash, []byte{}, maxNumberTransactions}
+//	ProofOfWork(block)
+//	return block
+//}
+
+func CreateBlock(id int, previousHash []byte) *BlockType {
+	block := &BlockType{id, 0, time.Now().Unix(), previousHash, []byte{}, 10}
 	ProofOfWork(block)
 	return block
 }
