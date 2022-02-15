@@ -1,12 +1,5 @@
 package main
 
-import (
-	"blockchain/database"
-	"github.com/gorilla/mux"
-	"log"
-	"net/http"
-)
-
 func main() {
 	//blockchain := components.InitializeBlockchain()
 	//
@@ -31,14 +24,5 @@ func main() {
 	//blockchain.AddTransaction("me", "me", 106, 1)
 	//blockchain.AddTransaction("me", "me", 102, 50)
 
-	db := database.ConnectDatabase()
-	h := database.New(db)
-	router := mux.NewRouter()
-
-	router.HandleFunc("/block", h.GetBlocks).Methods(http.MethodGet)
-	router.HandleFunc("/addBlock", h.AddBlock).Methods(http.MethodGet)
-	router.HandleFunc("/addGenesisBlock", h.AddGenesisBlock).Methods(http.MethodGet)
-
-	log.Println("running")
-	http.ListenAndServe(":4000", router)
+	initializeRoutes()
 }

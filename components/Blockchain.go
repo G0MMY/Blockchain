@@ -5,19 +5,16 @@ import (
 )
 
 type BlockchainType struct {
-	Chain   []*BlockType
-	Length  int
-	MemPool MemPool
+	Chain  []*BlockType
+	Length int
+	//MemPool MemPool
 }
 
 type Blockchain interface {
-	AddBlock()
-	AddGenesisBlock()
-	DisplayBlockchain()
 	GetLength() int
 	GetChain() []*BlockType
 	IsChainValid() bool
-	AddTransaction(string, string, int, int)
+	//AddTransaction(string, string, int, int)
 }
 
 //func InitializeBlockchain() *BlockchainType {
@@ -43,9 +40,9 @@ func (blockchain *BlockchainType) IsChainValid() bool {
 	return true
 }
 
-func (blockchain *BlockchainType) AddTransaction(sender string, receiver string, amount int, fee int) {
-	blockchain.MemPool.addTransaction(CreateTransaction(sender, receiver, amount, fee))
-}
+//func (blockchain *BlockchainType) AddTransaction(sender string, receiver string, amount int, fee int) {
+//	blockchain.MemPool.addTransaction(CreateTransaction(sender, receiver, amount, fee))
+//}
 
 func (blockchain *BlockchainType) GetChain() []*BlockType {
 	return blockchain.Chain
