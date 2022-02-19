@@ -1,7 +1,7 @@
-package database
+package Handlers
 
 import (
-	"blockchain/components"
+	"blockchain/Models"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,7 +15,7 @@ func (h Handler) IsChainValid(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Chain is null")
 	} else {
-		blockchain := &components.BlockchainType{Chain: blocks, Length: len(blocks)}
+		blockchain := &Controllers.Blockchain{Chain: blocks, Length: len(blocks)}
 
 		if blockchain.IsChainValid() {
 			w.Header().Add("Content-Type", "application/json")
@@ -49,8 +49,8 @@ func (h Handler) GetChainLength(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(h.GetLength())
 }
 
-func (h Handler) getChain() []*components.BlockType {
-	var blocks []*components.BlockType
+func (h Handler) getChain() []*Models.Block {
+	var blocks []*Models.Block
 
 	if result := h.DB.Find(&blocks); result.Error != nil {
 		fmt.Println(result.Error)
@@ -60,5 +60,5 @@ func (h Handler) getChain() []*components.BlockType {
 }
 
 func (h Handler) GetLength() int {
-	return h.GetLastBlock().Id
+	return h.GetLastBlock().ID
 }

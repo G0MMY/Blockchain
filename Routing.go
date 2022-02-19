@@ -1,15 +1,15 @@
 package main
 
 import (
-	"blockchain/database"
+	"blockchain/Handlers"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 )
 
 func initializeRoutes() {
-	db := database.ConnectDatabase()
-	h := database.New(db)
+	db := Handlers.ConnectDatabase()
+	h := Handlers.New(db)
 	router := mux.NewRouter()
 
 	router.HandleFunc("/blockchain", h.GetChain).Methods(http.MethodGet)

@@ -1,7 +1,7 @@
-package database
+package Handlers
 
 import (
-	"blockchain/components"
+	"blockchain/Models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
@@ -13,7 +13,7 @@ func ConnectDatabase() *gorm.DB {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	db.AutoMigrate(&components.BlockType{})
+	db.AutoMigrate(&Models.Block{}, &Models.Transaction{}, &Models.UnspentTransaction{}, &Models.Output{}, &Models.Input{})
 
 	return db
 }

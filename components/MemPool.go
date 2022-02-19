@@ -1,18 +1,17 @@
 package components
 
-type MemPoolType struct {
-	Transactions      []*TransactionType
-	NodeAddress       string
-	NumberTransaction int
+type MemPool struct {
+	Transactions []Transaction
+	NodeAddress  []byte
 }
 
-type MemPool interface {
-	addTransaction(*TransactionType)
-	getTransactions() []*TransactionType
+type IMemPool interface {
+	addTransaction(*Transaction)
+	getTransactions() []*Transaction
 	deleteNFirstTransactions(int)
 }
 
-func (memPool *MemPoolType) addTransaction(transaction *TransactionType) {
+/*func (memPool *MemPoolType) addTransaction(transaction *TransactionType) {
 	i := 0
 	transactions := memPool.Transactions
 
@@ -27,19 +26,19 @@ func (memPool *MemPoolType) addTransaction(transaction *TransactionType) {
 	}
 	memPool.NumberTransaction += 1
 	memPool.Transactions = append(memPool.Transactions, transaction)
-}
+}*/
 
-func (memPool *MemPoolType) deleteNFirstTransactions(quantity int) {
-	if quantity >= memPool.NumberTransaction {
-		var transactions []*TransactionType
-		memPool.Transactions = transactions
-		memPool.NumberTransaction = 0
-	} else {
-		memPool.Transactions = memPool.Transactions[quantity:]
-		memPool.NumberTransaction -= quantity
-	}
-}
-
-func (memPool *MemPoolType) getTransactions() []*TransactionType {
-	return memPool.Transactions
-}
+//func (memPool *MemPoolType) deleteNFirstTransactions(quantity int) {
+//	if quantity >= memPool.NumberTransaction {
+//		var transactions []*TransactionType
+//		memPool.Transactions = transactions
+//		memPool.NumberTransaction = 0
+//	} else {
+//		memPool.Transactions = memPool.Transactions[quantity:]
+//		memPool.NumberTransaction -= quantity
+//	}
+//}
+//
+//func (memPool *MemPoolType) getTransactions() []*TransactionType {
+//	return memPool.Transactions
+//}

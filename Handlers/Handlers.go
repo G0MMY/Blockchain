@@ -1,4 +1,4 @@
-package database
+package Handlers
 
 import "gorm.io/gorm"
 
