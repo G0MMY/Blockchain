@@ -1,6 +1,7 @@
 package Handlers
 
 import (
+	"blockchain/Controllers"
 	"blockchain/Models"
 	"encoding/json"
 	"fmt"
@@ -15,9 +16,9 @@ func (h Handler) IsChainValid(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Chain is null")
 	} else {
-		blockchain := &Controllers.Blockchain{Chain: blocks, Length: len(blocks)}
+		blockchain := &Models.Blockchain{Chain: blocks, Length: len(blocks)}
 
-		if blockchain.IsChainValid() {
+		if Controllers.IsChainValid(blockchain) {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode("The chain is valid")

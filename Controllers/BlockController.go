@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-func CreateBlock(id int, previousHash []byte) *Models.Block {
-	block := &Models.Block{id, 0, time.Now().Unix(), []Models.Transaction{}, previousHash, []byte{}, 10}
+func CreateBlock(previousHash []byte) *Models.Block {
+	block := &Models.Block{Nonce: 0, Timestamp: time.Now().Unix(), Transactions: []Models.Transaction{}, PreviousHash: previousHash, CurrentHash: []byte{}, MaxNumberTransactions: 10}
 	ProofOfWork(block)
 	return block
 }
@@ -34,4 +34,11 @@ func hash(nonce int, block *Models.Block) []byte {
 	hash := sha256.Sum256(info)
 
 	return hash[:]
+}
+
+func CheckBlock(block *Models.Block) bool {
+	if fmt.Sprintf("%s", hash(block.Nonce, block)) == fmt.Sprintf("%s", block.CurrentHash) {
+		return true
+	}
+	return false
 }

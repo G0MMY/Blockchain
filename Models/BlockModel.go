@@ -1,7 +1,7 @@
 package Models
 
 type Block struct {
-	ID                    int
+	ID                    int `gorm:"autoIncrement"`
 	Nonce                 int
 	Timestamp             int64
 	Transactions          []Transaction

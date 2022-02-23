@@ -1,15 +1,5 @@
 package components
 
-import (
-	"fmt"
-)
-
-type Blockchain struct {
-	Chain  []*Block
-	Length int
-	//MemPool MemPool
-}
-
 //func InitializeBlockchain() *Blockchain {
 //	var chain []*Block
 //	var transactions []*TransactionType
@@ -39,12 +29,12 @@ type Blockchain struct {
 //	blockchain.Chain = append(blockchain.Chain, block)
 //	blockchain.Length += 1
 //}
-
-func (blockchain *Blockchain) DisplayBlockchain() {
-	for _, block := range blockchain.Chain {
-		fmt.Printf("{ \n nonce: %d, \n", block.Nonce)
-		fmt.Printf(" timestamp: %d, \n", block.Timestamp)
-		fmt.Printf(" previousHash: %x, \n", block.PreviousHash)
-		fmt.Printf(" currentHash: %x, \n }, \n", block.CurrentHash)
-	}
-}
+//
+//func (blockchain *Blockchain) DisplayBlockchain() {
+//	for _, block := range blockchain.Chain {
+//		fmt.Printf("{ \n nonce: %d, \n", block.Nonce)
+//		fmt.Printf(" timestamp: %d, \n", block.Timestamp)
+//		fmt.Printf(" previousHash: %x, \n", block.PreviousHash)
+//		fmt.Printf(" currentHash: %x, \n }, \n", block.CurrentHash)
+//	}
+//}

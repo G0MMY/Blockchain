@@ -14,7 +14,7 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Can't add Genesis IBlock on top of existing blocks")
 	} else {
-		block := Controllers.CreateBlock(1, []byte{0})
+		block := Controllers.CreateBlock([]byte{0})
 
 		if result := h.DB.Create(&block); result.Error != nil {
 			w.Header().Add("Content-Type", "application/json")
@@ -29,7 +29,7 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
-	block := Controllers.CreateBlock(h.GetLength()+1, h.getPreviousHash())
+	block := Controllers.CreateBlock(h.getPreviousHash())
 
 	if block.PreviousHash != nil {
 		if result := h.DB.Create(&block); result.Error != nil {
@@ -52,7 +52,7 @@ func (h Handler) CheckLastBlock(w http.ResponseWriter, r *http.Request) {
 	block := h.GetLastBlock()
 
 	if block.ID != 0 {
-		if block.CheckBlock() {
+		if Controllers.CheckBlock(block) {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode("IBlock is good")

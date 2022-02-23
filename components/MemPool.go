@@ -1,15 +1,15 @@
 package components
 
-type MemPool struct {
-	Transactions []Transaction
-	NodeAddress  []byte
-}
-
-type IMemPool interface {
-	addTransaction(*Transaction)
-	getTransactions() []*Transaction
-	deleteNFirstTransactions(int)
-}
+//type MemPool struct {
+//	Transactions []Transaction
+//	NodeAddress  []byte
+//}
+//
+//type IMemPool interface {
+//	addTransaction(*Transaction)
+//	getTransactions() []*Transaction
+//	deleteNFirstTransactions(int)
+//}
 
 /*func (memPool *MemPoolType) addTransaction(transaction *TransactionType) {
 	i := 0
