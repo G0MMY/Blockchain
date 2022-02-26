@@ -6,15 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 	if h.GetLength() > 0 {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Can't add Genesis IBlock on top of existing blocks")
+		json.NewEncoder(w).Encode("Can't add Genesis Block on top of existing blocks")
 	} else {
-		block := Controllers.CreateBlock([]byte{0})
+		outputs := append([]Models.Output{}, Models.Output{Amount: 10000, PublicKey: []byte("maxim")})
+		transactions := append([]Models.Transaction{}, Models.Transaction{Outputs: outputs, Timestamp: time.Now().Unix()})
+		block := Controllers.CreateBlock([]byte{0}, transactions)
 
 		if result := h.DB.Create(&block); result.Error != nil {
 			w.Header().Add("Content-Type", "application/json")
@@ -23,13 +26,13 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode("Created")
+			json.NewEncoder(w).Encode(block)
 		}
 	}
 }
 
 func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
-	block := Controllers.CreateBlock(h.getPreviousHash())
+	block := Controllers.CreateBlock(h.getPreviousHash(), []Models.Transaction{})
 
 	if block.PreviousHash != nil {
 		if result := h.DB.Create(&block); result.Error != nil {
@@ -39,7 +42,7 @@ func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode("Created")
+			json.NewEncoder(w).Encode(block)
 		}
 	} else {
 		w.Header().Add("Content-Type", "application/json")
@@ -48,28 +51,8 @@ func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h Handler) CheckLastBlock(w http.ResponseWriter, r *http.Request) {
-	block := h.GetLastBlock()
-
-	if block.ID != 0 {
-		if Controllers.CheckBlock(block) {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode("IBlock is good")
-		} else {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode("IBlock isn't good")
-		}
-	} else {
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("IBlock not found")
-	}
-}
-
 func (h Handler) getPreviousHash() []byte {
-	return h.GetLastBlock().CurrentHash
+	return Controllers.Hash(h.GetLastBlock())
 }
 
 func (h Handler) GetLastBlock() *Models.Block {
