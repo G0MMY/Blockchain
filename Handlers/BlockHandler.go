@@ -32,7 +32,9 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
-	block := Controllers.CreateBlock(h.getPreviousHash(), []Models.Transaction{})
+	trans, ids := h.GetMemPoolTransactions()
+	memPoolTransactions := Controllers.FindBestMemPoolTransactions(trans, 5)
+	block := Controllers.CreateBlock(h.getPreviousHash(), Controllers.CreateTransactions(memPoolTransactions))
 
 	if block.PreviousHash != nil {
 		if result := h.DB.Create(&block); result.Error != nil {
@@ -40,9 +42,15 @@ func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(result.Error)
 		} else {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(block)
+			if h.DeleteMemPoolTransactions(ids) {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				json.NewEncoder(w).Encode(block)
+			} else {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode("There was an error with the transactions")
+			}
 		}
 	} else {
 		w.Header().Add("Content-Type", "application/json")

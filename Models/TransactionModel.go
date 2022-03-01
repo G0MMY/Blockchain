@@ -12,7 +12,7 @@ type Transaction struct {
 type Input struct {
 	ID            int `gorm:"autoIncrement"`
 	TransactionId int
-	OutputId      int
+	OutputId      int `gorm:"unique"`
 	Output        Output
 	Signature     string
 }
@@ -27,7 +27,7 @@ type Output struct {
 type MemPoolInput struct {
 	ID                   int `gorm:"autoIncrement"`
 	MemPoolTransactionId int
-	OutputId             int
+	OutputId             int `gorm:"unique"`
 	Output               Output
 	Signature            string
 }

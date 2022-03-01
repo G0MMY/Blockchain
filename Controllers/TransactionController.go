@@ -33,7 +33,16 @@ func CreateMemPoolOutputs(amount int, to []byte, inputs []Models.MemPoolInput) [
 	return outputs
 }
 
-func CreateTransaction(memPooltransaction Models.MemPoolTransaction) Models.Transaction {
+func CreateTransactions(memPoolTransactions []Models.MemPoolTransaction) []Models.Transaction {
+	var transactions []Models.Transaction
+
+	for _, memPoolTransaction := range memPoolTransactions {
+		transactions = append(transactions, createTransaction(memPoolTransaction))
+	}
+	return transactions
+}
+
+func createTransaction(memPooltransaction Models.MemPoolTransaction) Models.Transaction {
 	var inputs []Models.Input
 	var outputs []Models.Output
 	for _, input := range memPooltransaction.Inputs {
@@ -62,27 +71,34 @@ func GetOutputs(outputs []Models.Output, amount int) []Models.Output {
 			break
 		}
 	}
+	if amount > 0 {
+		return nil
+	}
 	return result
 }
 
 //need to check timestamp
 func FindBestMemPoolTransactions(transactions []Models.MemPoolTransaction, numberTransactions int) []Models.MemPoolTransaction {
-	result := transactions[:numberTransactions]
-	if len(transactions) > numberTransactions {
-		i := numberTransactions
-		for i < len(transactions) {
-			j := 0
-			for j < numberTransactions {
-				if transactions[i].Fee > result[j].Fee {
-					result[j] = transactions[i]
-					break
+	if len(transactions) < numberTransactions {
+		return transactions[:len(transactions)]
+	} else {
+		result := transactions[:numberTransactions]
+		if len(transactions) > numberTransactions {
+			i := numberTransactions
+			for i < len(transactions) {
+				j := 0
+				for j < numberTransactions {
+					if transactions[i].Fee > result[j].Fee {
+						result[j] = transactions[i]
+						break
+					}
+					j += 1
 				}
-				j += 1
+				i += 1
 			}
-			i += 1
 		}
+		return result
 	}
-	return result
 }
 
 func TransactionsToByte(transactions []Models.Transaction) []byte {
