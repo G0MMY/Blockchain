@@ -20,7 +20,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	outputs := Controllers.GetOutputs(h.getOutputs([]byte(body.From)), body.Amount)
+	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs([]byte(body.From)), body.Amount)
 	if outputs == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -42,25 +42,70 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h Handler) getOutputs(publicKey []byte) []Models.Output {
+func (h Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
+	transactions := h.getTransactions()
+
+	if transactions != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(transactions)
+	} else {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode("there are no transactions")
+	}
+}
+
+func (h Handler) getTransactions() []Models.Transaction {
+	var transactions []Models.Transaction
+	outputs := h.getOutputs()
+	inputs := h.getInputs()
+
+	if result := h.DB.Find(&transactions); result.Error != nil {
+		fmt.Println(result.Error)
+	}
+
+	i := 0
+	for i < len(transactions) {
+		for _, input := range inputs {
+			if input.TransactionId == transactions[i].ID {
+				transactions[i].Inputs = append(transactions[i].Inputs, input)
+			}
+		}
+		for _, output := range outputs {
+			if output.TransactionId == transactions[i].ID {
+				transactions[i].Outputs = append(transactions[i].Outputs, output)
+			}
+		}
+		i += 1
+	}
+	return transactions
+}
+
+func (h Handler) getOutputs() []Models.Output {
 	var outputs []Models.Output
 
-	result := h.DB.Find(&outputs).Where("public_key = ? "+
-		"and outputs.id not in (select output_id from inputs) "+
-		"and outputs.id not in (select output_id from mem_pool_inputs)", fmt.Sprintf("%s", publicKey)).Scan(&outputs)
-
-	if result.Error != nil {
+	if result := h.DB.Find(&outputs); result.Error != nil {
 		fmt.Println(result.Error)
 	}
 	return outputs
 }
 
-func (h Handler) getMemPoolOutputsForPubKey(publicKey []byte) []Models.MemPoolOutput {
-	var outputs []Models.MemPoolOutput
+func (h Handler) getInputs() []Models.Input {
+	var inputs []Models.Input
 
-	result := h.DB.Find(&outputs).Where("public_key = ? "+
+	if result := h.DB.Find(&inputs); result.Error != nil {
+		fmt.Println(result.Error)
+	}
+	return inputs
+}
+
+func (h Handler) getPublicKeyOutputs(publicKey []byte) []Models.Output {
+	var outputs []Models.Output
+
+	result := h.DB.Where("public_key = ? "+
 		"and outputs.id not in (select output_id from inputs) "+
-		"and outputs.id not in (select output_id from mem_pool_inputs)", fmt.Sprintf("%s", publicKey)).Scan(&outputs)
+		"and outputs.id not in (select output_id from mem_pool_inputs)", fmt.Sprintf("%s", publicKey)).Find(&outputs)
 
 	if result.Error != nil {
 		fmt.Println(result.Error)
@@ -86,24 +131,17 @@ func (h Handler) getMemPoolOutputs() []Models.MemPoolOutput {
 	return outputs
 }
 
-func (h Handler) getMemPoolTransactions() []Models.MemPoolTransaction {
-	var memPoolTransactions []Models.MemPoolTransaction
-
-	if result := h.DB.Find(&memPoolTransactions); result.Error != nil {
-		fmt.Println(result.Error)
-	}
-	return memPoolTransactions
-}
-
-func (h Handler) GetMemPoolTransactions() ([]Models.MemPoolTransaction, []int) {
+func (h Handler) GetMemPoolTransactions() []Models.MemPoolTransaction {
+	var transactions []Models.MemPoolTransaction
 	outputs := h.getMemPoolOutputs()
 	inputs := h.getMemPoolInputs()
-	transactions := h.getMemPoolTransactions()
-	var ids []int
+
+	if result := h.DB.Find(&transactions); result.Error != nil {
+		fmt.Println(result.Error)
+	}
 
 	i := 0
 	for i < len(transactions) {
-		ids = append(ids, transactions[i].ID)
 		for _, input := range inputs {
 			if input.MemPoolTransactionId == transactions[i].ID {
 				transactions[i].Inputs = append(transactions[i].Inputs, input)
@@ -116,7 +154,7 @@ func (h Handler) GetMemPoolTransactions() ([]Models.MemPoolTransaction, []int) {
 		}
 		i += 1
 	}
-	return transactions, ids
+	return transactions
 }
 
 func (h Handler) DeleteMemPoolTransactions(ids []int) bool {

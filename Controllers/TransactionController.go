@@ -101,6 +101,14 @@ func FindBestMemPoolTransactions(transactions []Models.MemPoolTransaction, numbe
 	}
 }
 
+func GetMemPoolTransactionsIds(memPoolTransactions []Models.MemPoolTransaction) []int {
+	var ids []int
+	for _, transaction := range memPoolTransactions {
+		ids = append(ids, transaction.ID)
+	}
+	return ids
+}
+
 func TransactionsToByte(transactions []Models.Transaction) []byte {
 	var byteArray [][]byte
 	for _, transaction := range transactions {

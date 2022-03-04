@@ -32,12 +32,13 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
-	trans, ids := h.GetMemPoolTransactions()
-	memPoolTransactions := Controllers.FindBestMemPoolTransactions(trans, 5)
+	transactions := h.GetMemPoolTransactions()
+	memPoolTransactions := Controllers.FindBestMemPoolTransactions(transactions, 2)
+	ids := Controllers.GetMemPoolTransactionsIds(memPoolTransactions)
 	block := Controllers.CreateBlock(h.getPreviousHash(), Controllers.CreateTransactions(memPoolTransactions))
 
 	if block.PreviousHash != nil {
-		if result := h.DB.Create(&block); result.Error != nil {
+		if result := h.DB.Create(block); result.Error != nil {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(result.Error)

@@ -18,6 +18,7 @@ func initializeRoutes() {
 	router.HandleFunc("/isChainValid", h.IsChainValid).Methods(http.MethodGet)
 	router.HandleFunc("/getChainLength", h.GetChainLength).Methods(http.MethodGet)
 	router.HandleFunc("/createTransaction", h.CreateTransaction).Methods(http.MethodPost)
+	router.HandleFunc("/getTransactions", h.GetTransactions).Methods(http.MethodGet)
 
 	log.Println("running")
 	http.ListenAndServe(":4000", router)

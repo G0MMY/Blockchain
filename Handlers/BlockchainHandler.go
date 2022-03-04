@@ -52,11 +52,21 @@ func (h Handler) GetChainLength(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) getChain() []*Models.Block {
 	var blocks []*Models.Block
+	transactions := h.getTransactions()
 
 	if result := h.DB.Find(&blocks); result.Error != nil {
 		fmt.Println(result.Error)
 	}
 
+	i := 0
+	for i < len(blocks) {
+		for _, transaction := range transactions {
+			if transaction.BlockID == blocks[i].ID {
+				blocks[i].Transactions = append(blocks[i].Transactions, transaction)
+			}
+		}
+		i += 1
+	}
 	return blocks
 }
 
