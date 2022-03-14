@@ -1,4 +1,4 @@
-package Handlers
+package main
 
 import (
 	"blockchain/Models"
@@ -13,7 +13,7 @@ func ConnectDatabase() *gorm.DB {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	db.AutoMigrate(&Models.Block{}, &Models.Transaction{}, &Models.Output{}, &Models.Input{}, &Models.MemPoolTransaction{}, &Models.MemPoolInput{}, &Models.MemPoolOutput{})
+	db.AutoMigrate(&Models.Block{}, &Models.Transaction{}, &Models.Output{}, &Models.Input{}, &Models.MemPoolTransaction{}, &Models.MemPoolInput{}, &Models.MemPoolOutput{}, &Models.Wallet{})
 
 	return db
 }

@@ -14,7 +14,7 @@ type Input struct {
 	TransactionId int
 	OutputId      int `gorm:"unique"`
 	Output        Output
-	Signature     string
+	Signature     []byte
 }
 
 type Output struct {
@@ -29,7 +29,7 @@ type MemPoolInput struct {
 	MemPoolTransactionId int
 	OutputId             int `gorm:"unique"`
 	Output               Output
-	Signature            string
+	Signature            []byte
 }
 
 type MemPoolOutput struct {
@@ -47,10 +47,11 @@ type MemPoolTransaction struct {
 	Timestamp int64
 }
 
+//change that
 type CreateTransaction struct {
 	Amount    int
 	From      string
 	To        string
-	Signature string
+	Signature []byte
 	Fee       int
 }

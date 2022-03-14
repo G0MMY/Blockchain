@@ -8,7 +8,7 @@ import (
 )
 
 func initializeRoutes() {
-	db := Handlers.ConnectDatabase()
+	db := ConnectDatabase()
 	h := Handlers.New(db)
 	router := mux.NewRouter()
 
@@ -19,6 +19,7 @@ func initializeRoutes() {
 	router.HandleFunc("/getChainLength", h.GetChainLength).Methods(http.MethodGet)
 	router.HandleFunc("/createTransaction", h.CreateTransaction).Methods(http.MethodPost)
 	router.HandleFunc("/getTransactions", h.GetTransactions).Methods(http.MethodGet)
+	router.HandleFunc("/createWallet", h.CreateWallet).Methods(http.MethodGet)
 
 	log.Println("running")
 	http.ListenAndServe(":4000", router)

@@ -14,6 +14,10 @@ func CreateBlock(previousHash []byte, transactions []Models.Transaction) *Models
 	return block
 }
 
+func CreateTransactionBlock() *Models.Block {
+	return &Models.Block{0, 0, time.Now().Unix(), []byte{}, []byte{}, 0, []Models.Transaction{}}
+}
+
 //****************Implement difficulty***********************
 func ProofOfWork(block *Models.Block, transactions []Models.Transaction) {
 	i := 0
