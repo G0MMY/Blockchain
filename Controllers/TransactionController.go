@@ -12,10 +12,10 @@ func CreateMemPoolTransaction(inputs []Models.MemPoolInput, outputs []Models.Mem
 }
 
 //check signature
-func CreateMemPoolInputs(signature []byte, outputs []Models.Output) []Models.MemPoolInput {
+func CreateMemPoolInputs(outputs []Models.Output) []Models.MemPoolInput {
 	var inputs []Models.MemPoolInput
 	for _, output := range outputs {
-		inputs = append(inputs, Models.MemPoolInput{OutputId: output.ID, Output: output, Signature: signature})
+		inputs = append(inputs, Models.MemPoolInput{OutputId: output.ID, Output: output})
 	}
 	return inputs
 }

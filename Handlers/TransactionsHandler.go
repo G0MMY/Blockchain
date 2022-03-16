@@ -20,16 +20,17 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs([]byte(body.From)), body.Amount)
+	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs(Controllers.GetPublicKeyFromPrivateKey([]byte(body.PrivateKey))), body.Amount)
 	if outputs == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("you do not have enough money my friend")
 		return
 	}
-	memPoolInput := Controllers.CreateMemPoolInputs(body.Signature, outputs)
+	memPoolInput := Controllers.CreateMemPoolInputs(outputs)
 	memPoolOutput := Controllers.CreateMemPoolOutputs(body.Amount, []byte(body.To), memPoolInput)
 	memPoolTransaction := Controllers.CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee)
+	memPoolTransaction = Controllers.SignTransaction([]byte(body.PrivateKey), memPoolTransaction)
 
 	if result := h.DB.Create(&memPoolTransaction); result.Error != nil {
 		w.Header().Add("Content-Type", "application/json")

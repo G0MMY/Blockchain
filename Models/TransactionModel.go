@@ -49,9 +49,8 @@ type MemPoolTransaction struct {
 
 //change that
 type CreateTransaction struct {
-	Amount    int
-	From      string
-	To        string
-	Signature []byte
-	Fee       int
+	Amount     int
+	To         string
+	Fee        int
+	PrivateKey string
 }
