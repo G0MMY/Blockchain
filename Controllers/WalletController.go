@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 )
 
 func CreateWallet() Models.Wallet {
@@ -18,7 +19,7 @@ func CreateWallet() Models.Wallet {
 }
 
 func GenerateNewKeyPair() (string, string) {
-	bitSize := 64
+	bitSize := 4096
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	if err != nil {
@@ -27,17 +28,24 @@ func GenerateNewKeyPair() (string, string) {
 
 	publicKey := getPublicKeyFromPrivateKey(privateKey)
 
-	stringPrivateKey, stringPublicKey := fmt.Sprintf("%s", EncodePrivateKey(privateKey)), fmt.Sprintf("%s", EncodePublicKey(publicKey))
+	stringPrivateKey, stringPublicKey := string(EncodePrivateKey(privateKey)), string(EncodePublicKey(publicKey))
 
-	return CleanKey(stringPrivateKey), CleanKey(stringPublicKey)
+	return CleanPrivateKey(stringPrivateKey), CleanPublicKey(stringPublicKey)
 }
 
-func CleanKey(key string) string {
-	return key[32 : len(key)-31]
+func CleanPublicKey(key string) string {
+	return strings.ReplaceAll(key[31:len(key)-30], "\n", "")
 }
 
-func StringKeyToByte(key string) []byte {
+func CleanPrivateKey(key string) string {
+	return strings.ReplaceAll(key[32:len(key)-31], "\n", "")
+}
+
+func StringPrivateKeyToByte(key string) []byte {
 	return []byte("-----BEGIN RSA PRIVATE KEY-----\n" + key + "\n-----END RSA PRIVATE KEY-----")
+}
+func StringPublicKeyToByte(key string) []byte {
+	return []byte("-----BEGIN RSA PUBLIC KEY-----\n" + key + "\n-----END RSA PUBLIC KEY-----")
 }
 
 func EncodePublicKey(publicKey crypto.PublicKey) []byte {
@@ -56,6 +64,10 @@ func EncodePrivateKey(privateKey *rsa.PrivateKey) []byte {
 			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 		},
 	)
+}
+
+func GetDecodedKey(privateKey []byte) ([]byte, []byte) {
+	return EncodePrivateKey(DecodePrivateKey(privateKey)), GetPublicKeyFromPrivateKey(privateKey)
 }
 
 func GetPublicKeyFromPrivateKey(privateKey []byte) []byte {
@@ -107,8 +119,10 @@ func DecodePublicKey(publicKey []byte) *rsa.PublicKey {
 
 func ValidateTransaction(transaction Models.MemPoolTransaction) bool {
 	for _, input := range transaction.Inputs {
-		fmt.Println(string(input.Output.PublicKey))
-		err := validateSignature(DecodePublicKey(StringKeyToByte(string(input.Output.PublicKey))), input.Signature, HashInt(input.Output.Amount))
+		pub := StringPublicKeyToByte(string(input.Output.PublicKey))
+		decodedPub := DecodePublicKey(pub)
+		err := validateSignature(decodedPub, input.Signature, HashInt(input.Output.Amount))
+
 		if err != nil {
 			fmt.Println(err)
 			return false
@@ -122,6 +136,7 @@ func validateSignature(publicKey *rsa.PublicKey, signature []byte, amount []byte
 }
 
 func Sign(amount []byte, privateKey *rsa.PrivateKey) []byte {
+	fmt.Println(privateKey.Size())
 	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, amount)
 	if err != nil {
 		fmt.Println(err)

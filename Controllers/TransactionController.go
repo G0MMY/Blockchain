@@ -20,11 +20,11 @@ func CreateMemPoolInputs(outputs []Models.Output) []Models.MemPoolInput {
 	return inputs
 }
 
-func BuildTransaction(outputs []Models.Output, body Models.CreateTransaction) Models.MemPoolTransaction {
+func BuildTransaction(outputs []Models.Output, body Models.CreateTransaction, privateKey []byte) Models.MemPoolTransaction {
 	memPoolInput := CreateMemPoolInputs(outputs)
 	memPoolOutput := CreateMemPoolOutputs(body.Amount, []byte(body.To), memPoolInput)
 	memPoolTransaction := CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee)
-	return SignTransaction(StringKeyToByte(body.PrivateKey), memPoolTransaction)
+	return SignTransaction(privateKey, memPoolTransaction)
 }
 
 func CreateMemPoolOutputs(amount int, to []byte, inputs []Models.MemPoolInput) []Models.MemPoolOutput {

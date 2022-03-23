@@ -21,7 +21,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	pub := Controllers.GetPublicKeyFromPrivateKey(Controllers.StringKeyToByte(body.PrivateKey))
+	priv, pub := Controllers.GetDecodedKey(Controllers.StringPrivateKeyToByte(body.PrivateKey))
 	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs(pub), body.Amount)
 	if outputs == nil {
 		w.Header().Add("Content-Type", "application/json")
@@ -30,7 +30,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	memPoolTransaction := Controllers.BuildTransaction(outputs, body)
+	memPoolTransaction := Controllers.BuildTransaction(outputs, body, priv)
 	if Controllers.ValidateTransaction(memPoolTransaction) {
 		if result := h.DB.Create(&memPoolTransaction); result.Error != nil {
 			w.Header().Add("Content-Type", "application/json")
@@ -111,7 +111,7 @@ func (h Handler) getPublicKeyOutputs(publicKey []byte) []Models.Output {
 
 	result := h.DB.Where("public_key = ? "+
 		"and outputs.id not in (select output_id from inputs) "+
-		"and outputs.id not in (select output_id from mem_pool_inputs)", Controllers.CleanKey(fmt.Sprintf("%s", publicKey))).Find(&outputs)
+		"and outputs.id not in (select output_id from mem_pool_inputs)", Controllers.CleanPublicKey(string(publicKey))).Find(&outputs)
 
 	if result.Error != nil {
 		fmt.Println(result.Error)
