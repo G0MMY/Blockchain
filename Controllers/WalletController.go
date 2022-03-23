@@ -18,7 +18,7 @@ func CreateWallet() Models.Wallet {
 }
 
 func GenerateNewKeyPair() (string, string) {
-	bitSize := 4096
+	bitSize := 64
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	if err != nil {
@@ -27,7 +27,17 @@ func GenerateNewKeyPair() (string, string) {
 
 	publicKey := getPublicKeyFromPrivateKey(privateKey)
 
-	return fmt.Sprintf("%s", EncodePrivateKey(privateKey)), fmt.Sprintf("%s", EncodePublicKey(publicKey))
+	stringPrivateKey, stringPublicKey := fmt.Sprintf("%s", EncodePrivateKey(privateKey)), fmt.Sprintf("%s", EncodePublicKey(publicKey))
+
+	return CleanKey(stringPrivateKey), CleanKey(stringPublicKey)
+}
+
+func CleanKey(key string) string {
+	return key[32 : len(key)-31]
+}
+
+func StringKeyToByte(key string) []byte {
+	return []byte("-----BEGIN RSA PRIVATE KEY-----\n" + key + "\n-----END RSA PRIVATE KEY-----")
 }
 
 func EncodePublicKey(publicKey crypto.PublicKey) []byte {
@@ -50,9 +60,13 @@ func EncodePrivateKey(privateKey *rsa.PrivateKey) []byte {
 
 func GetPublicKeyFromPrivateKey(privateKey []byte) []byte {
 	priv := DecodePrivateKey(privateKey)
-	pub := priv.Public()
+	if priv != nil {
+		pub := priv.Public()
 
-	return EncodePublicKey(pub)
+		return EncodePublicKey(pub)
+	}
+
+	return nil
 }
 
 func getPublicKeyFromPrivateKey(privateKey *rsa.PrivateKey) crypto.PublicKey {
@@ -61,29 +75,40 @@ func getPublicKeyFromPrivateKey(privateKey *rsa.PrivateKey) crypto.PublicKey {
 
 func DecodePrivateKey(privateKey []byte) *rsa.PrivateKey {
 	block, _ := pem.Decode(privateKey)
-	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		fmt.Println("failed to decode PEM block containing private key")
+	} else {
+		priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 
-	if err != nil {
-		fmt.Println(err)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return priv
 	}
 
-	return priv
+	return nil
 }
 
 func DecodePublicKey(publicKey []byte) *rsa.PublicKey {
 	block, _ := pem.Decode(publicKey)
-	pub, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if block == nil || block.Type != "RSA PUBLIC KEY" {
+		fmt.Println("failed to decode PEM block containing public key")
+	} else {
+		pub, err := x509.ParsePKCS1PublicKey(block.Bytes)
 
-	if err != nil {
-		fmt.Println(err)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		return pub
 	}
-
-	return pub
+	return nil
 }
 
-func ValidateTransaction(transaction Models.Transaction) bool {
+func ValidateTransaction(transaction Models.MemPoolTransaction) bool {
 	for _, input := range transaction.Inputs {
-		err := validateSignature(DecodePublicKey(input.Output.PublicKey), input.Signature, HashInt(input.Output.Amount))
+		fmt.Println(string(input.Output.PublicKey))
+		err := validateSignature(DecodePublicKey(StringKeyToByte(string(input.Output.PublicKey))), input.Signature, HashInt(input.Output.Amount))
 		if err != nil {
 			fmt.Println(err)
 			return false
@@ -114,7 +139,10 @@ func HashInt(value int) []byte {
 func SignTransaction(privateKey []byte, transaction Models.MemPoolTransaction) Models.MemPoolTransaction {
 	result := transaction
 	for i, input := range transaction.Inputs {
-		result.Inputs[i].Signature = Sign(HashInt(input.Output.Amount), DecodePrivateKey(privateKey))
+		priv := DecodePrivateKey(privateKey)
+		if priv != nil {
+			result.Inputs[i].Signature = Sign(HashInt(input.Output.Amount), priv)
+		}
 	}
 
 	return result

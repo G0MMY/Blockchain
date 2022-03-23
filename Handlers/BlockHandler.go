@@ -15,7 +15,7 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Can't add Genesis Block on top of existing blocks")
 	} else {
-		outputs := append([]Models.Output{}, Models.Output{Amount: 10000, PublicKey: []byte("-----BEGIN RSA PUBLIC KEY-----MIICCgKCAgEAnqewLhvBAA3EF0Uob7FgFnuhBowR02TlysaXmDpncM8YohwfrmCtlUW5yBb3vmbFC1dYON+T7Kh76fk+kKyVhLn2L8X6bI4jkWesInI3PONIs8O+qLfBCtmQeFVWiKhdjmhcGU6Rxj1MZGEe3CF1D28DbOq5N6KHos2MZSmisLUHRPTmml5Au0xpPvoWy4Euoy7BoWjJnBnyUVWU7jh8vE9Hbtw3CvH5Fj7A3YrZPBCSBqAsG9eWIi3odBDTpXoHd0qjqsJfU6MRv5g7PK48j2RdjEB4I6BphuAlTomzJJbPAx2bQ4iNoqCKpWfu7y8weY3DI2yZlS/5IvSGgplRXH4NC3uuu9dB2JsT8TN5tvZtsvkyhXpmw2332oCgZEqN/dwFmT2Iwvolhy6BHNPW/OkJd5+aIxondx6RGWqrgCbqeOJ/IBFu8vdPk7n8jCZvst58iojvVx+PeabbzVlil7GbBfVcFn27XWINsNCNZGNo1NeCrC+EVwVLrvskiNvnUidW5R29IQEvZxujAOtgYo6sk4Q9aCgHqaLzFuX0LMJOKgNoXvOGIf9LZ3jpn52ZixMVETSxssRkH4WfP6bAIMOXl0MvLxjhvYdzVqhUoHmvhyrGtyzjG6A0cGzi3KErfQWQcjtkgpLi0GVfWBqHQGeCmWrENzcPIeNzE+v0DsECAwEAAQ==-----END RSA PUBLIC KEY-----")})
+		outputs := append([]Models.Output{}, Models.Output{Amount: 10000, PublicKey: []byte("BACCQDdwVo7bey+gwIDAQA")})
 		transactions := append([]Models.Transaction{}, Models.Transaction{Outputs: outputs, Timestamp: time.Now().Unix()})
 		block := Controllers.CreateBlock([]byte{0}, transactions)
 

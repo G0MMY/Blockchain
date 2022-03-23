@@ -8,6 +8,7 @@ import (
 	"net/http"
 )
 
+//gotta check in memPool to check future outputs to do more transactions
 func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	var body Models.CreateTransaction
 	decoder := json.NewDecoder(r.Body)
@@ -20,26 +21,30 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs(Controllers.GetPublicKeyFromPrivateKey([]byte(body.PrivateKey))), body.Amount)
+	pub := Controllers.GetPublicKeyFromPrivateKey(Controllers.StringKeyToByte(body.PrivateKey))
+	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs(pub), body.Amount)
 	if outputs == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("you do not have enough money my friend")
 		return
 	}
-	memPoolInput := Controllers.CreateMemPoolInputs(outputs)
-	memPoolOutput := Controllers.CreateMemPoolOutputs(body.Amount, []byte(body.To), memPoolInput)
-	memPoolTransaction := Controllers.CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee)
-	memPoolTransaction = Controllers.SignTransaction([]byte(body.PrivateKey), memPoolTransaction)
 
-	if result := h.DB.Create(&memPoolTransaction); result.Error != nil {
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(result.Error)
+	memPoolTransaction := Controllers.BuildTransaction(outputs, body)
+	if Controllers.ValidateTransaction(memPoolTransaction) {
+		if result := h.DB.Create(&memPoolTransaction); result.Error != nil {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(result.Error)
+		} else {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(memPoolTransaction)
+		}
 	} else {
 		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(memPoolTransaction)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("Transaction not properly signed")
 	}
 }
 
@@ -106,7 +111,7 @@ func (h Handler) getPublicKeyOutputs(publicKey []byte) []Models.Output {
 
 	result := h.DB.Where("public_key = ? "+
 		"and outputs.id not in (select output_id from inputs) "+
-		"and outputs.id not in (select output_id from mem_pool_inputs)", fmt.Sprintf("%s", publicKey)).Find(&outputs)
+		"and outputs.id not in (select output_id from mem_pool_inputs)", Controllers.CleanKey(fmt.Sprintf("%s", publicKey))).Find(&outputs)
 
 	if result.Error != nil {
 		fmt.Println(result.Error)
