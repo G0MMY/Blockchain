@@ -21,7 +21,7 @@ type Output struct {
 	ID            int `gorm:"autoIncrement"`
 	TransactionId int
 	Amount        int
-	PublicKey     []byte
+	PublicKey     string
 }
 
 type MemPoolInput struct {
@@ -36,7 +36,7 @@ type MemPoolOutput struct {
 	ID                   int `gorm:"autoIncrement"`
 	MemPoolTransactionId int
 	Amount               int
-	PublicKey            []byte
+	PublicKey            string
 }
 
 type MemPoolTransaction struct {

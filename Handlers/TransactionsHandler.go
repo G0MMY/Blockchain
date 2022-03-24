@@ -3,8 +3,10 @@ package Handlers
 import (
 	"blockchain/Controllers"
 	"blockchain/Models"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"net/http"
 )
 
@@ -21,7 +23,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	priv, pub := Controllers.GetDecodedKey(Controllers.StringPrivateKeyToByte(body.PrivateKey))
+	priv, pub := Controllers.GetDecodedKey(Controllers.StringKeyToByte(body.PrivateKey))
 	outputs := Controllers.GetOutputs(h.getPublicKeyOutputs(pub), body.Amount)
 	if outputs == nil {
 		w.Header().Add("Content-Type", "application/json")
@@ -31,7 +33,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	memPoolTransaction := Controllers.BuildTransaction(outputs, body, priv)
-	if Controllers.ValidateTransaction(memPoolTransaction) {
+	if Controllers.ValidateMemPoolTransaction(memPoolTransaction) {
 		if result := h.DB.Create(&memPoolTransaction); result.Error != nil {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
@@ -45,6 +47,29 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Transaction not properly signed")
+	}
+}
+
+func (h Handler) ValidateTransaction(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	transaction := h.getTransaction(vars["transactionId"])
+
+	if transaction.Inputs == nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("The id dosen't belong to any transaction")
+	} else {
+		ok := Controllers.ValidateTransaction(transaction)
+
+		if ok {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode("The transaction is validated")
+		} else {
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode("Transaction not properly signed")
+		}
 	}
 }
 
@@ -62,6 +87,19 @@ func (h Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h Handler) getTransaction(id string) Models.Transaction {
+	var transaction Models.Transaction
+	outputs := h.getOutputsId(id)
+	inputs := h.getInputsId(id)
+	inputs = Controllers.LinkInputs(inputs, h.getOutputs())
+
+	if result := h.DB.Find(&transaction, id); result.Error != nil {
+		fmt.Println(result.Error)
+	}
+
+	return Controllers.LinkTransactions([]Models.Transaction{transaction}, inputs, outputs)[0]
+}
+
 func (h Handler) getTransactions() []Models.Transaction {
 	var transactions []Models.Transaction
 	outputs := h.getOutputs()
@@ -71,27 +109,22 @@ func (h Handler) getTransactions() []Models.Transaction {
 		fmt.Println(result.Error)
 	}
 
-	i := 0
-	for i < len(transactions) {
-		for _, input := range inputs {
-			if input.TransactionId == transactions[i].ID {
-				transactions[i].Inputs = append(transactions[i].Inputs, input)
-			}
-		}
-		for _, output := range outputs {
-			if output.TransactionId == transactions[i].ID {
-				transactions[i].Outputs = append(transactions[i].Outputs, output)
-			}
-		}
-		i += 1
-	}
-	return transactions
+	return Controllers.LinkTransactions(transactions, inputs, outputs)
 }
 
 func (h Handler) getOutputs() []Models.Output {
 	var outputs []Models.Output
 
 	if result := h.DB.Find(&outputs); result.Error != nil {
+		fmt.Println(result.Error)
+	}
+	return outputs
+}
+
+func (h Handler) getOutputsId(id string) []Models.Output {
+	var outputs []Models.Output
+
+	if result := h.DB.Where("transaction_id = ?", id).Find(&outputs); result.Error != nil {
 		fmt.Println(result.Error)
 	}
 	return outputs
@@ -106,12 +139,21 @@ func (h Handler) getInputs() []Models.Input {
 	return inputs
 }
 
+func (h Handler) getInputsId(id string) []Models.Input {
+	var inputs []Models.Input
+
+	if result := h.DB.Where("transaction_id = ?", id).Find(&inputs); result.Error != nil {
+		fmt.Println(result.Error)
+	}
+	return inputs
+}
+
 func (h Handler) getPublicKeyOutputs(publicKey []byte) []Models.Output {
 	var outputs []Models.Output
 
 	result := h.DB.Where("public_key = ? "+
 		"and outputs.id not in (select output_id from inputs) "+
-		"and outputs.id not in (select output_id from mem_pool_inputs)", Controllers.CleanPublicKey(string(publicKey))).Find(&outputs)
+		"and outputs.id not in (select output_id from mem_pool_inputs)", hex.EncodeToString(publicKey)).Find(&outputs)
 
 	if result.Error != nil {
 		fmt.Println(result.Error)

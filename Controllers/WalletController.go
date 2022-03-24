@@ -7,9 +7,9 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"strings"
 )
 
 func CreateWallet() Models.Wallet {
@@ -28,24 +28,19 @@ func GenerateNewKeyPair() (string, string) {
 
 	publicKey := getPublicKeyFromPrivateKey(privateKey)
 
-	stringPrivateKey, stringPublicKey := string(EncodePrivateKey(privateKey)), string(EncodePublicKey(publicKey))
+	stringPrivateKey, stringPublicKey := hex.EncodeToString(EncodePrivateKey(privateKey)), hex.EncodeToString(EncodePublicKey(publicKey))
 
-	return CleanPrivateKey(stringPrivateKey), CleanPublicKey(stringPublicKey)
+	return stringPrivateKey, stringPublicKey
 }
 
-func CleanPublicKey(key string) string {
-	return strings.ReplaceAll(key[31:len(key)-30], "\n", "")
-}
+func StringKeyToByte(key string) []byte {
+	result, err := hex.DecodeString(key)
 
-func CleanPrivateKey(key string) string {
-	return strings.ReplaceAll(key[32:len(key)-31], "\n", "")
-}
+	if err != nil {
+		fmt.Println(err)
+	}
 
-func StringPrivateKeyToByte(key string) []byte {
-	return []byte("-----BEGIN RSA PRIVATE KEY-----\n" + key + "\n-----END RSA PRIVATE KEY-----")
-}
-func StringPublicKeyToByte(key string) []byte {
-	return []byte("-----BEGIN RSA PUBLIC KEY-----\n" + key + "\n-----END RSA PUBLIC KEY-----")
+	return result
 }
 
 func EncodePublicKey(publicKey crypto.PublicKey) []byte {
@@ -117,9 +112,26 @@ func DecodePublicKey(publicKey []byte) *rsa.PublicKey {
 	return nil
 }
 
-func ValidateTransaction(transaction Models.MemPoolTransaction) bool {
+func ValidateTransaction(transaction Models.Transaction) bool {
 	for _, input := range transaction.Inputs {
-		pub := StringPublicKeyToByte(string(input.Output.PublicKey))
+		pub := StringKeyToByte(input.Output.PublicKey)
+		decodedPub := DecodePublicKey(pub)
+		if decodedPub == nil {
+			return false
+		}
+		err := validateSignature(decodedPub, input.Signature, HashInt(input.Output.Amount))
+
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+	}
+	return true
+}
+
+func ValidateMemPoolTransaction(transaction Models.MemPoolTransaction) bool {
+	for _, input := range transaction.Inputs {
+		pub := StringKeyToByte(input.Output.PublicKey)
 		decodedPub := DecodePublicKey(pub)
 		err := validateSignature(decodedPub, input.Signature, HashInt(input.Output.Amount))
 

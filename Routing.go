@@ -20,6 +20,7 @@ func initializeRoutes() {
 	router.HandleFunc("/createTransaction", h.CreateTransaction).Methods(http.MethodPost)
 	router.HandleFunc("/getTransactions", h.GetTransactions).Methods(http.MethodGet)
 	router.HandleFunc("/createWallet", h.CreateWallet).Methods(http.MethodGet)
+	router.HandleFunc("/validateTransaction/{transactionId}", h.ValidateTransaction).Methods(http.MethodGet)
 
 	log.Println("running")
 	http.ListenAndServe(":4000", router)

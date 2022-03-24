@@ -20,14 +20,49 @@ func CreateMemPoolInputs(outputs []Models.Output) []Models.MemPoolInput {
 	return inputs
 }
 
+func LinkInputs(inputs []Models.Input, outputs []Models.Output) []Models.Input {
+	result := inputs
+
+	for i, input := range inputs {
+		for _, output := range outputs {
+			if output.ID == input.OutputId {
+				result[i].Output = output
+				break
+			}
+		}
+	}
+
+	return result
+}
+
+func LinkTransactions(transactions []Models.Transaction, inputs []Models.Input, outputs []Models.Output) []Models.Transaction {
+	i := 0
+
+	for i < len(transactions) {
+		for _, input := range inputs {
+			if input.TransactionId == transactions[i].ID {
+				transactions[i].Inputs = append(transactions[i].Inputs, input)
+			}
+		}
+		for _, output := range outputs {
+			if output.TransactionId == transactions[i].ID {
+				transactions[i].Outputs = append(transactions[i].Outputs, output)
+			}
+		}
+		i += 1
+	}
+
+	return transactions
+}
+
 func BuildTransaction(outputs []Models.Output, body Models.CreateTransaction, privateKey []byte) Models.MemPoolTransaction {
 	memPoolInput := CreateMemPoolInputs(outputs)
-	memPoolOutput := CreateMemPoolOutputs(body.Amount, []byte(body.To), memPoolInput)
+	memPoolOutput := CreateMemPoolOutputs(body.Amount, body.To, memPoolInput)
 	memPoolTransaction := CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee)
 	return SignTransaction(privateKey, memPoolTransaction)
 }
 
-func CreateMemPoolOutputs(amount int, to []byte, inputs []Models.MemPoolInput) []Models.MemPoolOutput {
+func CreateMemPoolOutputs(amount int, to string, inputs []Models.MemPoolInput) []Models.MemPoolOutput {
 	totalAmount := 0
 	for _, input := range inputs {
 		totalAmount += input.Output.Amount
