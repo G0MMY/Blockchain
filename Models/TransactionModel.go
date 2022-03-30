@@ -7,6 +7,7 @@ type Transaction struct {
 	Inputs    []Input
 	Outputs   []Output
 	Timestamp int64
+	Fee       int
 }
 
 type Input struct {
@@ -24,30 +25,16 @@ type Output struct {
 	PublicKey     string
 }
 
-type MemPoolInput struct {
-	ID                   int `gorm:"autoIncrement"`
-	MemPoolTransactionId int
-	OutputId             int `gorm:"unique"`
-	Output               Output
-	Signature            []byte
+func (transaction Transaction) TableName() string {
+	if transaction.Fee != 0 && transaction.BlockID == 0 {
+		return "memPool_Transaction"
+	}
+
+	return "transaction"
 }
 
-type MemPoolOutput struct {
-	ID                   int `gorm:"autoIncrement"`
-	MemPoolTransactionId int
-	Amount               int
-	PublicKey            string
-}
-
-type MemPoolTransaction struct {
-	ID        int `gorm:"autoIncrement"`
-	Inputs    []MemPoolInput
-	Outputs   []MemPoolOutput
-	Fee       int
-	Timestamp int64
-}
-
-//change that
+//pay minner with fee
+//change that add timestamp
 type CreateTransaction struct {
 	Amount     int
 	To         string

@@ -35,9 +35,9 @@ func (h Handler) AddGenesisBlock(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
 	transactions := h.GetMemPoolTransactions()
-	memPoolTransactions := Controllers.FindBestMemPoolTransactions(transactions, 2)
+	memPoolTransactions := Controllers.FindBestMemPoolTransactions(transactions, 4)
 	ids := Controllers.GetMemPoolTransactionsIds(memPoolTransactions)
-	block := Controllers.CreateBlock(h.getPreviousHash(), Controllers.CreateTransactions(memPoolTransactions))
+	block := Controllers.CreateBlock(h.getPreviousHash(), memPoolTransactions)
 
 	if block.PreviousHash != nil {
 		if result := h.DB.Create(block); result.Error != nil {
@@ -45,7 +45,7 @@ func (h Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(result.Error)
 		} else {
-			if h.DeleteMemPoolTransactions(ids) {
+			if ids == nil || h.LinkTransactions(*block, ids) {
 				w.Header().Add("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
 				json.NewEncoder(w).Encode(block)

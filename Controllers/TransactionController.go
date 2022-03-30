@@ -3,21 +3,40 @@ package Controllers
 import (
 	"blockchain/Models"
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"time"
 )
 
-func CreateMemPoolTransaction(inputs []Models.MemPoolInput, outputs []Models.MemPoolOutput, fee int) Models.MemPoolTransaction {
-	return Models.MemPoolTransaction{Inputs: inputs, Outputs: outputs, Timestamp: time.Now().Unix(), Fee: fee}
+func CreateMemPoolTransaction(inputs []Models.Input, outputs []Models.Output, fee int) Models.Transaction {
+	if fee <= 0 {
+		panic("The fee must be greater then 0")
+		return Models.Transaction{}
+	}
+
+	return Models.Transaction{Inputs: inputs, Outputs: outputs, Timestamp: time.Now().Unix(), Fee: fee}
 }
 
-//check signature
-func CreateMemPoolInputs(outputs []Models.Output) []Models.MemPoolInput {
-	var inputs []Models.MemPoolInput
+func CreateMemPoolInputs(outputs []Models.Output) []Models.Input {
+	var inputs []Models.Input
 	for _, output := range outputs {
-		inputs = append(inputs, Models.MemPoolInput{OutputId: output.ID, Output: output})
+		inputs = append(inputs, Models.Input{OutputId: output.ID, Output: output})
 	}
 	return inputs
+}
+
+func CreateMemPoolOutputs(amount int, to string, inputs []Models.Input) []Models.Output {
+	totalAmount := 0
+	for _, input := range inputs {
+		totalAmount += input.Output.Amount
+	}
+
+	outputs := append([]Models.Output{}, Models.Output{Amount: amount, PublicKey: to})
+	if totalAmount-amount > 0 {
+		outputs = append(outputs, Models.Output{Amount: totalAmount - amount, PublicKey: inputs[0].Output.PublicKey})
+	}
+
+	return outputs
 }
 
 func LinkInputs(inputs []Models.Input, outputs []Models.Output) []Models.Input {
@@ -55,53 +74,23 @@ func LinkTransactions(transactions []Models.Transaction, inputs []Models.Input, 
 	return transactions
 }
 
-func BuildTransaction(outputs []Models.Output, body Models.CreateTransaction, privateKey []byte) Models.MemPoolTransaction {
+func BuildTransaction(outputs []Models.Output, body Models.CreateTransaction, privateKey []byte) Models.Transaction {
 	memPoolInput := CreateMemPoolInputs(outputs)
 	memPoolOutput := CreateMemPoolOutputs(body.Amount, body.To, memPoolInput)
 	memPoolTransaction := CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee)
 	return SignTransaction(privateKey, memPoolTransaction)
 }
 
-func CreateMemPoolOutputs(amount int, to string, inputs []Models.MemPoolInput) []Models.MemPoolOutput {
-	totalAmount := 0
-	for _, input := range inputs {
-		totalAmount += input.Output.Amount
-	}
-	var outputs []Models.MemPoolOutput
-	outputs = append(outputs, Models.MemPoolOutput{Amount: amount, PublicKey: to})
-	if totalAmount-amount > 0 {
-		outputs = append(outputs, Models.MemPoolOutput{Amount: totalAmount - amount, PublicKey: inputs[0].Output.PublicKey})
-	}
-	return outputs
-}
+func GetMemPoolTransactions(transactions []Models.Transaction) []Models.Transaction {
+	var result []Models.Transaction
 
-func CreateTransactions(memPoolTransactions []Models.MemPoolTransaction) []Models.Transaction {
-	var transactions []Models.Transaction
-
-	for _, memPoolTransaction := range memPoolTransactions {
-		transactions = append(transactions, createTransaction(memPoolTransaction))
+	for _, transaction := range transactions {
+		if transaction.TableName() == "memPool_Transaction" {
+			result = append(result, transaction)
+		}
 	}
-	return transactions
-}
 
-func createTransaction(memPooltransaction Models.MemPoolTransaction) Models.Transaction {
-	var inputs []Models.Input
-	var outputs []Models.Output
-	for _, input := range memPooltransaction.Inputs {
-		inputs = append(inputs, memPoolInputToInput(input))
-	}
-	for _, output := range memPooltransaction.Outputs {
-		outputs = append(outputs, memPoolOutputToInput(output))
-	}
-	return Models.Transaction{Inputs: inputs, Outputs: outputs, Timestamp: memPooltransaction.Timestamp}
-}
-
-func memPoolInputToInput(memPoolInput Models.MemPoolInput) Models.Input {
-	return Models.Input{OutputId: memPoolInput.OutputId, Output: memPoolInput.Output, Signature: memPoolInput.Signature}
-}
-
-func memPoolOutputToInput(memPoolOutput Models.MemPoolOutput) Models.Output {
-	return Models.Output{Amount: memPoolOutput.Amount, PublicKey: memPoolOutput.PublicKey}
+	return result
 }
 
 func GetOutputs(outputs []Models.Output, amount int) []Models.Output {
@@ -119,41 +108,55 @@ func GetOutputs(outputs []Models.Output, amount int) []Models.Output {
 	return result
 }
 
-//need to check timestamp
-func FindBestMemPoolTransactions(transactions []Models.MemPoolTransaction, numberTransactions int) []Models.MemPoolTransaction {
-	if len(transactions) < numberTransactions {
-		return transactions[:len(transactions)]
-	} else {
-		result := transactions[:numberTransactions]
-		if len(transactions) > numberTransactions {
-			i := numberTransactions
-			for i < len(transactions) {
-				j := 0
-				for j < numberTransactions {
-					if transactions[i].Fee > result[j].Fee {
-						result[j] = transactions[i]
-						break
+func FindBestMemPoolTransactions(transactions []Models.Transaction, numberTransactions int) []Models.Transaction {
+	var memPoolTransactions []Models.Transaction
+	i := 0
+
+	for i < len(transactions) {
+		if transactions[i].Timestamp < time.Now().Unix() && transactions[i].TableName() == "memPool_Transaction" {
+			if ValidateTransaction(transactions[i]) {
+				if len(memPoolTransactions) < numberTransactions {
+					if len(memPoolTransactions) == 0 {
+						memPoolTransactions = append(memPoolTransactions, transactions[i])
+					} else {
+						for j, transaction := range memPoolTransactions {
+							if transaction.Fee <= transactions[i].Fee {
+								memPoolTransactions = append(memPoolTransactions[:j+1], memPoolTransactions[j:]...)
+								memPoolTransactions[j] = transactions[i]
+								break
+							}
+						}
 					}
-					j += 1
+				} else if memPoolTransactions[len(memPoolTransactions)-1].Fee < transactions[i].Fee {
+					memPoolTransactions = insertTransaction(memPoolTransactions, transactions[i])[:numberTransactions]
 				}
-				i += 1
 			}
 		}
-		return result
+		i++
 	}
+
+	return memPoolTransactions
 }
 
-func GetMemPoolTransactionsIds(memPoolTransactions []Models.MemPoolTransaction) []int {
+func insertTransaction(transactions []Models.Transaction, transaction Models.Transaction) []Models.Transaction {
+	for i, trans := range transactions {
+		if transaction.Fee > trans.Fee {
+			transactions = append(transactions[:i+1], transactions[i:]...)
+			transactions[i] = transaction
+			break
+		}
+	}
+
+	return transactions
+}
+
+func GetMemPoolTransactionsIds(memPoolTransactions []Models.Transaction) []int {
 	var ids []int
 	for _, transaction := range memPoolTransactions {
 		ids = append(ids, transaction.ID)
 	}
 	return ids
 }
-
-//func InputToByte(input Models.MemPoolInput) []byte {
-//
-//}
 
 func TransactionsToByte(transactions []Models.Transaction) []byte {
 	var byteArray [][]byte
@@ -162,3 +165,11 @@ func TransactionsToByte(transactions []Models.Transaction) []byte {
 	}
 	return bytes.Join(byteArray, []byte{})
 }
+
+func hashTransaction(transaction Models.Transaction) []byte {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%x", transaction)))
+
+	return hash[:]
+}
+
+//func buildMerkleTree(transactions []Models.Transaction)

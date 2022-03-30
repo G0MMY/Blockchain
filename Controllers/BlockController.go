@@ -9,7 +9,7 @@ import (
 )
 
 func CreateBlock(previousHash []byte, transactions []Models.Transaction) *Models.Block {
-	block := &Models.Block{Nonce: 0, Timestamp: time.Now().Unix(), MerkleRoot: []byte{}, PreviousHash: previousHash, Difficulty: 4, Transactions: transactions}
+	block := &Models.Block{Nonce: 0, Timestamp: time.Now().Unix(), MerkleRoot: []byte{}, PreviousHash: previousHash, Difficulty: 2, Transactions: transactions}
 	ProofOfWork(block, transactions)
 	return block
 }
@@ -22,7 +22,7 @@ func CreateTransactionBlock() *Models.Block {
 func ProofOfWork(block *Models.Block, transactions []Models.Transaction) {
 	i := 0
 	stringhash := fmt.Sprintf("%x", hash(i, block, transactions))
-	for stringhash[0:4] != "0000" {
+	for stringhash[0:2] != "00" {
 		i += 1
 		stringhash = fmt.Sprintf("%x", hash(i, block, transactions))
 	}
@@ -31,8 +31,8 @@ func ProofOfWork(block *Models.Block, transactions []Models.Transaction) {
 
 func hash(nonce int, block *Models.Block, transactions []Models.Transaction) []byte {
 	info := bytes.Join([][]byte{
-		[]byte(fmt.Sprintf("%x", nonce)),
-		[]byte(fmt.Sprintf("%x", block.Timestamp)),
+		[]byte(fmt.Sprintf("%d", nonce)),
+		[]byte(fmt.Sprintf("%d", block.Timestamp)),
 		block.MerkleRoot,
 		block.PreviousHash,
 		TransactionsToByte(transactions),
@@ -44,8 +44,8 @@ func hash(nonce int, block *Models.Block, transactions []Models.Transaction) []b
 
 func Hash(block *Models.Block) []byte {
 	info := bytes.Join([][]byte{
-		[]byte(fmt.Sprintf("%x", block.Nonce)),
-		[]byte(fmt.Sprintf("%x", block.Timestamp)),
+		[]byte(fmt.Sprintf("%d", block.Nonce)),
+		[]byte(fmt.Sprintf("%d", block.Timestamp)),
 		block.MerkleRoot,
 		block.PreviousHash,
 		TransactionsToByte(block.Transactions),

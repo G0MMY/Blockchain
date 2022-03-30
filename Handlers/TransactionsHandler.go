@@ -33,7 +33,7 @@ func (h Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	memPoolTransaction := Controllers.BuildTransaction(outputs, body, priv)
-	if Controllers.ValidateMemPoolTransaction(memPoolTransaction) {
+	if Controllers.ValidateTransaction(memPoolTransaction) {
 		if result := h.DB.Create(&memPoolTransaction); result.Error != nil {
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
@@ -151,27 +151,38 @@ func (h Handler) getInputsId(id string) []Models.Input {
 func (h Handler) getPublicKeyOutputs(publicKey []byte) []Models.Output {
 	var outputs []Models.Output
 
-	result := h.DB.Where("public_key = ? "+
-		"and outputs.id not in (select output_id from inputs) "+
-		"and outputs.id not in (select output_id from mem_pool_inputs)", hex.EncodeToString(publicKey)).Find(&outputs)
+	resultOutputs := h.DB.Where("public_key = ? "+
+		"and outputs.id not in (select output_id from inputs)", hex.EncodeToString(publicKey)).Find(&outputs)
 
-	if result.Error != nil {
-		fmt.Println(result.Error)
+	if resultOutputs.Error != nil {
+		fmt.Println(resultOutputs.Error)
 	}
 	return outputs
 }
 
-func (h Handler) getMemPoolInputs() []Models.MemPoolInput {
-	var inputs []Models.MemPoolInput
+func (h Handler) getMemPoolInputs() []Models.Input {
+	var inputs []Models.Input
 
 	if result := h.DB.Find(&inputs); result.Error != nil {
 		fmt.Println(result.Error)
 	}
+
+	for i, input := range inputs {
+		var output Models.Output
+
+		if result := h.DB.Where("id = ?", input.OutputId).Find(&output); result.Error != nil {
+			fmt.Println(result.Error)
+			break
+		}
+
+		inputs[i].Output = output
+	}
+
 	return inputs
 }
 
-func (h Handler) getMemPoolOutputs() []Models.MemPoolOutput {
-	var outputs []Models.MemPoolOutput
+func (h Handler) getMemPoolOutputs() []Models.Output {
+	var outputs []Models.Output
 
 	if result := h.DB.Find(&outputs); result.Error != nil {
 		fmt.Println(result.Error)
@@ -179,8 +190,8 @@ func (h Handler) getMemPoolOutputs() []Models.MemPoolOutput {
 	return outputs
 }
 
-func (h Handler) GetMemPoolTransactions() []Models.MemPoolTransaction {
-	var transactions []Models.MemPoolTransaction
+func (h Handler) GetMemPoolTransactions() []Models.Transaction {
+	var transactions []Models.Transaction
 	outputs := h.getMemPoolOutputs()
 	inputs := h.getMemPoolInputs()
 
@@ -188,39 +199,34 @@ func (h Handler) GetMemPoolTransactions() []Models.MemPoolTransaction {
 		fmt.Println(result.Error)
 	}
 
-	i := 0
-	for i < len(transactions) {
-		for _, input := range inputs {
-			if input.MemPoolTransactionId == transactions[i].ID {
-				transactions[i].Inputs = append(transactions[i].Inputs, input)
-			}
-		}
-		for _, output := range outputs {
-			if output.MemPoolTransactionId == transactions[i].ID {
-				transactions[i].Outputs = append(transactions[i].Outputs, output)
-			}
-		}
-		i += 1
-	}
-	return transactions
+	return Controllers.GetMemPoolTransactions(Controllers.LinkTransactions(transactions, inputs, outputs))
 }
 
-func (h Handler) DeleteMemPoolTransactions(ids []int) bool {
-	var output Models.MemPoolOutput
-	var input Models.MemPoolInput
-	var transaction Models.MemPoolTransaction
+//func (h Handler) DeleteMemPoolTransactions(ids []int) bool {
+//	var output Models.MemPoolOutput
+//	var input Models.MemPoolInput
+//	var transaction Models.MemPoolTransaction
+//
+//	if result := h.DB.Where("mem_pool_transaction_id in ?", ids).Delete(&output); result.Error != nil {
+//		fmt.Println(result.Error)
+//		return false
+//	}
+//	if result := h.DB.Where("mem_pool_transaction_id in ?", ids).Delete(&input); result.Error != nil {
+//		fmt.Println(result.Error)
+//		return false
+//	}
+//	if result := h.DB.Where("id in ?", ids).Delete(&transaction); result.Error != nil {
+//		fmt.Println(result.Error)
+//		return false
+//	}
+//	return true
+//}
 
-	if result := h.DB.Where("mem_pool_transaction_id in ?", ids).Delete(&output); result.Error != nil {
+func (h Handler) LinkTransactions(block Models.Block, ids []int) bool {
+	if result := h.DB.Table("transaction").Where("id in ?", ids).Updates(map[string]interface{}{"block_id": block.ID, "fee": 0}); result.Error != nil {
 		fmt.Println(result.Error)
 		return false
 	}
-	if result := h.DB.Where("mem_pool_transaction_id in ?", ids).Delete(&input); result.Error != nil {
-		fmt.Println(result.Error)
-		return false
-	}
-	if result := h.DB.Where("id in ?", ids).Delete(&transaction); result.Error != nil {
-		fmt.Println(result.Error)
-		return false
-	}
+
 	return true
 }

@@ -1,5 +1,9 @@
 package main
 
+import "blockchain/Controllers"
+
 func main() {
-	initializeRoutes()
+	//initializeRoutes()
+
+	Controllers.Test()
 }
