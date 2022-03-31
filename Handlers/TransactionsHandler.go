@@ -202,26 +202,6 @@ func (h Handler) GetMemPoolTransactions() []Models.Transaction {
 	return Controllers.GetMemPoolTransactions(Controllers.LinkTransactions(transactions, inputs, outputs))
 }
 
-//func (h Handler) DeleteMemPoolTransactions(ids []int) bool {
-//	var output Models.MemPoolOutput
-//	var input Models.MemPoolInput
-//	var transaction Models.MemPoolTransaction
-//
-//	if result := h.DB.Where("mem_pool_transaction_id in ?", ids).Delete(&output); result.Error != nil {
-//		fmt.Println(result.Error)
-//		return false
-//	}
-//	if result := h.DB.Where("mem_pool_transaction_id in ?", ids).Delete(&input); result.Error != nil {
-//		fmt.Println(result.Error)
-//		return false
-//	}
-//	if result := h.DB.Where("id in ?", ids).Delete(&transaction); result.Error != nil {
-//		fmt.Println(result.Error)
-//		return false
-//	}
-//	return true
-//}
-
 func (h Handler) LinkTransactions(block Models.Block, ids []int) bool {
 	if result := h.DB.Table("transaction").Where("id in ?", ids).Updates(map[string]interface{}{"block_id": block.ID, "fee": 0}); result.Error != nil {
 		fmt.Println(result.Error)

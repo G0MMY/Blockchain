@@ -33,11 +33,10 @@ func (transaction Transaction) TableName() string {
 	return "transaction"
 }
 
-//pay minner with fee
-//change that add timestamp
 type CreateTransaction struct {
 	Amount     int
 	To         string
 	Fee        int
 	PrivateKey string
+	Timestamp  int64
 }

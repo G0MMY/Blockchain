@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-func CreateMemPoolTransaction(inputs []Models.Input, outputs []Models.Output, fee int) Models.Transaction {
+func CreateMemPoolTransaction(inputs []Models.Input, outputs []Models.Output, fee int, timestamp int64) Models.Transaction {
 	if fee <= 0 {
 		panic("The fee must be greater then 0")
 		return Models.Transaction{}
 	}
 
-	return Models.Transaction{Inputs: inputs, Outputs: outputs, Timestamp: time.Now().Unix(), Fee: fee}
+	return Models.Transaction{Inputs: inputs, Outputs: outputs, Timestamp: timestamp, Fee: fee}
 }
 
 func CreateMemPoolInputs(outputs []Models.Output) []Models.Input {
@@ -77,7 +77,7 @@ func LinkTransactions(transactions []Models.Transaction, inputs []Models.Input, 
 func BuildTransaction(outputs []Models.Output, body Models.CreateTransaction, privateKey []byte) Models.Transaction {
 	memPoolInput := CreateMemPoolInputs(outputs)
 	memPoolOutput := CreateMemPoolOutputs(body.Amount, body.To, memPoolInput)
-	memPoolTransaction := CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee)
+	memPoolTransaction := CreateMemPoolTransaction(memPoolInput, memPoolOutput, body.Fee, body.Timestamp)
 	return SignTransaction(privateKey, memPoolTransaction)
 }
 
@@ -172,4 +172,6 @@ func hashTransaction(transaction Models.Transaction) []byte {
 	return hash[:]
 }
 
-//func buildMerkleTree(transactions []Models.Transaction)
+func buildMerkleTree(transactions []Models.Transaction) Models.MerkleTree {
+	
+}
