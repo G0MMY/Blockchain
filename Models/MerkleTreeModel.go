@@ -1,20 +1,15 @@
 package Models
 
+type Tree struct {
+	RootNode *Node
+}
+
 type Node struct {
-	Hash       []byte
-	LeftChild  *Node
-	RightChild *Node
-	Leaf       *Transaction
+	Data      []byte
+	LeftNode  *Node
+	RightNode *Node
 }
 
-type MerkleTree struct {
-	root *Node
-}
-
-func (node Node) GetLeaf() Transaction {
-	if node.LeftChild == nil && node.RightChild == nil {
-		return *node.Leaf
-	}
-
-	return Transaction{}
+func CreateTree(transactions []*Transaction) *Tree {
+	return &Tree{}
 }

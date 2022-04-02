@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
+	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/gomodule/redigo v1.8.4 // indirect
 	github.com/googollee/go-socket.io v1.6.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
@@ -23,6 +24,7 @@ require (
 	github.com/lib/pq v1.10.4 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	golang.org/x/crypto v0.0.0-20220210151621-f4118a5b28e2 // indirect

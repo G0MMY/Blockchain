@@ -1,42 +1,33 @@
 package Models
 
+import "time"
+
+var (
+	coinbaseAmount = 10
+)
+
 type Transaction struct {
-	ID        int `gorm:"autoIncrement"`
-	BlockID   int
-	Block     Block
-	Inputs    []Input
-	Outputs   []Output
+	Inputs    []*Input
+	Outputs   []*Output
 	Timestamp int64
 	Fee       int
 }
 
 type Input struct {
-	ID            int `gorm:"autoIncrement"`
-	TransactionId int
-	OutputId      int `gorm:"unique"`
-	Output        Output
-	Signature     []byte
+	OutputTransactionId []byte
+	OutputIndex         int
+	Signature           []byte
 }
 
 type Output struct {
-	ID            int `gorm:"autoIncrement"`
-	TransactionId int
+	PublicKeyHash []byte
 	Amount        int
-	PublicKey     string
 }
 
-func (transaction Transaction) TableName() string {
-	if transaction.Fee != 0 && transaction.BlockID == 0 {
-		return "memPool_Transaction"
-	}
+//use pub key hash
+func CreateCoinbase(address []byte) *Transaction {
+	input := &Input{[]byte{}, -1, []byte{}}
+	output := &Output{address, coinbaseAmount}
 
-	return "transaction"
-}
-
-type CreateTransaction struct {
-	Amount     int
-	To         string
-	Fee        int
-	PrivateKey string
-	Timestamp  int64
+	return &Transaction{[]*Input{input}, []*Output{output}, time.Now().Unix(), 0}
 }
