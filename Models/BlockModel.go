@@ -27,11 +27,22 @@ func CreateGenesisBlock(address []byte) *Block {
 
 	block := &Block{0, 0, time.Now().Unix(), CreateTree([]*Transaction{coinbase}), []byte{}, []*Transaction{coinbase}}
 	block.Proof()
+	block.LinkCoinbase()
 
 	return block
 }
 
-func (block Block) Proof() {
+func (block *Block) LinkCoinbase() {
+	for _, transaction := range block.Transactions {
+		if transaction.IsCoinbase() {
+			hash := block.Hash()
+			transaction.Inputs[0].OutputTransactionId = hash
+			transaction.Inputs[0].OutputBlockId = hash
+		}
+	}
+}
+
+func (block *Block) Proof() {
 	var intHash big.Int
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-difficulty))
@@ -46,7 +57,7 @@ func (block Block) Proof() {
 	}
 }
 
-func (block Block) Hash() []byte {
+func (block *Block) Hash() []byte {
 	hash := sha256.Sum256(block.EncodeBlock())
 
 	return hash[:]
@@ -63,7 +74,7 @@ func DecodeBlock(byteBlock []byte) *Block {
 	return &block
 }
 
-func (block Block) EncodeBlock() []byte {
+func (block *Block) EncodeBlock() []byte {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
 

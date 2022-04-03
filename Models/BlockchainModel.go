@@ -49,35 +49,39 @@ func InitBlockchain(address []byte) *Blockchain {
 	return blockchain
 }
 
-func (blockchain Blockchain) GetBlockchain() []*Block {
-	blockchainIterator := BlockchainIterator{blockchain.LastHash, blockchain.DB}
+func (blockchain *Blockchain) GetBlockchain() []*Block {
+	blockchainIterator := &BlockchainIterator{blockchain.LastHash, blockchain.DB}
 
 	return blockchainIterator.GetBlockchain()
 }
 
-func (iter BlockchainIterator) GetBlockchain() []*Block {
+func (iter *BlockchainIterator) GetBlockchain() []*Block {
 	var blockchain []*Block
 
-	currentBlock := iter.next()
+	currentBlock := iter.Next()
 	if currentBlock != nil {
 		blockchain = append(blockchain, currentBlock)
 
-		for bytes.Compare(currentBlock.PreviousHash, []byte{}) != 0 {
-			blockchain = append(blockchain, iter.next())
+		for bytes.Compare(iter.CurrentHash, []byte{}) != 0 {
+			blockchain = append(blockchain, iter.Next())
 		}
 	}
 
 	return blockchain
 }
 
-func (iter BlockchainIterator) next() *Block {
+func (iter *BlockchainIterator) Next() *Block {
 	var read *opt.ReadOptions
 
 	if byteBlock, err := iter.DB.Get(iter.CurrentHash, read); err != nil {
 		log.Panic(err)
 	} else {
 		currentBlock := DecodeBlock(byteBlock)
-		iter.CurrentHash = currentBlock.Hash()
+
+		if bytes.Compare(currentBlock.Hash(), iter.CurrentHash) != 0 {
+			log.Panic("The chain is invalid")
+		}
+		iter.CurrentHash = currentBlock.PreviousHash
 
 		return currentBlock
 	}
@@ -85,7 +89,7 @@ func (iter BlockchainIterator) next() *Block {
 	return nil
 }
 
-func (blockchain Blockchain) GetLastBlock() *Block {
+func (blockchain *Blockchain) GetLastBlock() *Block {
 	if blockchain.DB != nil {
 		var read *opt.ReadOptions
 
@@ -99,17 +103,17 @@ func (blockchain Blockchain) GetLastBlock() *Block {
 }
 
 //add merkle root and transactions
-func (blockchain Blockchain) CreateBlock() {
+func (blockchain *Blockchain) CreateBlock() {
 	lastBlock := blockchain.GetLastBlock()
 
 	if lastBlock != nil {
 		block := Block{lastBlock.Index + 1, 0, time.Now().Unix(), &Tree{}, blockchain.LastHash, []*Transaction{}}
 
-		blockchain.LastHash = blockchain.AddBlock(&block)
+		blockchain.AddBlock(&block)
 	}
 }
 
-func (blockchain Blockchain) AddBlock(block *Block) []byte {
+func (blockchain *Blockchain) AddBlock(block *Block) {
 	var write *opt.WriteOptions
 	hash := block.Hash()
 
@@ -121,5 +125,13 @@ func (blockchain Blockchain) AddBlock(block *Block) []byte {
 		log.Panic(err)
 	}
 
-	return hash
+	blockchain.LastHash = hash
+}
+
+func (blockchain *Blockchain) GetOutputsForPubKey(publickKey []byte, amount int) []*Output {
+	return nil
+}
+
+func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) {
+
 }

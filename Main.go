@@ -8,12 +8,19 @@ import (
 func main() {
 	blockchain := Models.InitBlockchain([]byte("test"))
 
-	blockchain.CreateBlock()
-	blockchain.CreateBlock()
-	blockchain.CreateBlock()
-	blockchain.CreateBlock()
+	//blockchain.CreateBlock()
+	//blockchain.CreateBlock()
+	//blockchain.CreateBlock()
+	//blockchain.CreateBlock()
 
 	chain := blockchain.GetBlockchain()
 
-	fmt.Println(chain)
+	for _, block := range chain {
+		fmt.Printf("block height: %d\n", block.Index)
+		fmt.Printf("block hash: %x\n", block.Hash())
+		fmt.Println()
+		fmt.Println()
+	}
+
+	blockchain.DB.Close()
 }
