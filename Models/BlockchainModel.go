@@ -5,7 +5,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"log"
-	"time"
 )
 
 type Blockchain struct {
@@ -102,14 +101,26 @@ func (blockchain *Blockchain) GetLastBlock() *Block {
 	return nil
 }
 
+func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
+	var read *opt.ReadOptions
+
+	if blockByte, err := blockchain.DB.Get(blockHash, read); err != nil {
+		log.Panic(err)
+	} else {
+		return DecodeBlock(blockByte)
+	}
+
+	return nil
+}
+
 //add merkle root and transactions
-func (blockchain *Blockchain) CreateBlock() {
+func (blockchain *Blockchain) CreateBlock(address []byte) {
 	lastBlock := blockchain.GetLastBlock()
 
 	if lastBlock != nil {
-		block := Block{lastBlock.Index + 1, 0, time.Now().Unix(), &Tree{}, blockchain.LastHash, []*Transaction{}}
+		block := CreateBlock(address, lastBlock.Index+1, blockchain.LastHash, []*Transaction{}, &Tree{})
 
-		blockchain.AddBlock(&block)
+		blockchain.AddBlock(block)
 	}
 }
 
@@ -126,6 +137,36 @@ func (blockchain *Blockchain) AddBlock(block *Block) {
 	}
 
 	blockchain.LastHash = hash
+}
+
+func (blockchain *Blockchain) GetUnspentOutputs(from []byte) *UnspentOutput {
+	var read *opt.ReadOptions
+
+	key := bytes.Join([][]byte{
+		[]byte("UnspentOutput-"),
+		from,
+	}, []byte{})
+
+	if outputs, err := blockchain.DB.Get(key, read); err != nil {
+		log.Panic(err)
+	} else {
+		return DecodeUnspentOutput(outputs)
+	}
+
+	return nil
+}
+
+func (blockchain *Blockchain) AddUnspentOutputs(transaction *Transaction) {
+	var write *opt.WriteOptions
+
+	for _, output := range transaction.Outputs {
+		unspentOutputs := blockchain.GetUnspentOutputs(output.PublicKeyHash)
+		unspentOutputs.outputs = append(unspentOutputs.outputs, output)
+
+		if err := blockchain.DB.Put(output.PublicKeyHash, unspentOutputs.EncodeUnspentOutput(), write); err != nil {
+			log.Panic(err)
+		}
+	}
 }
 
 func (blockchain *Blockchain) GetOutputsForPubKey(publickKey []byte, amount int) []*Output {

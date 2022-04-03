@@ -31,20 +31,46 @@ type Output struct {
 	Amount           int
 }
 
+type UnspentOutput struct {
+	outputs []*Output
+}
+
 //use pub key hash
 func CreateCoinbase(address []byte) *Transaction {
 	input := &Input{&Output{}, []byte{}}
-	output := &Output{address, coinbaseAmount}
+	output := &Output{[]byte{}, -1, 0, address, coinbaseAmount}
 
 	return &Transaction{[]*Input{input}, []*Output{output}, time.Now().Unix(), 0}
 }
 
 func (transaction *Transaction) IsCoinbase() bool {
-	if transaction.Fee == 0 && len(transaction.Inputs) == 1 && len(transaction.Outputs) == 1 && transaction.Inputs[0].OutputIndex == -1 {
+	if transaction.Fee == 0 && len(transaction.Inputs) == 1 && len(transaction.Outputs) == 1 && transaction.Inputs[0].output == nil {
 		return true
 	}
 
 	return false
+}
+
+func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+
+	if err := encoder.Encode(unspentOutput); err != nil {
+		log.Panic(err)
+	}
+
+	return buffer.Bytes()
+}
+
+func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
+	var output UnspentOutput
+	decoder := gob.NewDecoder(bytes.NewReader(byteOutput))
+
+	if err := decoder.Decode(&output); err != nil {
+		log.Panic(err)
+	}
+
+	return &output
 }
 
 func (transaction *Transaction) EncodeTransaction() []byte {
