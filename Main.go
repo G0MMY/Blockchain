@@ -20,7 +20,6 @@ func main() {
 		fmt.Printf("block height: %d\n", block.Index)
 		fmt.Printf("block hash: %x\n", block.Hash())
 		fmt.Println()
-		fmt.Println()
 	}
 
 	blockchain.DB.Close()

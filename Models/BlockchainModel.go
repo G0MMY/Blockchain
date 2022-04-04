@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"log"
 )
 
@@ -156,6 +157,34 @@ func (blockchain *Blockchain) GetUnspentOutputs(from []byte) *UnspentOutput {
 	return nil
 }
 
+func (blockchain *Blockchain) UpdateUnspentOutputs(output UnspentOutput) {
+	var write *opt.WriteOptions
+
+	key := bytes.Join([][]byte{
+		[]byte("UnspentOutput-"),
+		output.outputs[0].PublicKeyHash,
+	}, []byte{})
+
+	if err := blockchain.DB.Put(key, output.EncodeUnspentOutput(), write); err != nil {
+		log.Panic(err)
+	}
+}
+
+func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
+	var read *opt.ReadOptions
+	var transactions []*Transaction
+
+	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("MemPool-")), read)
+
+	for iter.Next() {
+		byteTransaction := iter.Value()
+		transactions = append(transactions, DecodeTransaction(byteTransaction))
+	}
+	iter.Release()
+
+	return transactions
+}
+
 func (blockchain *Blockchain) AddUnspentOutputs(transaction *Transaction) {
 	var write *opt.WriteOptions
 
@@ -169,10 +198,20 @@ func (blockchain *Blockchain) AddUnspentOutputs(transaction *Transaction) {
 	}
 }
 
-func (blockchain *Blockchain) GetOutputsForPubKey(publickKey []byte, amount int) []*Output {
-	return nil
-}
-
 func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) {
+	var write *opt.WriteOptions
 
+	unspentOutputs := blockchain.GetUnspentOutputs(from)
+	outputRest, amountRest := unspentOutputs.GetOutputsForAmount(amount + fee)
+	blockchain.UpdateUnspentOutputs(UnspentOutput{outputRest})
+
+	transaction := CreateTransaction(to, from, amount, amountRest, fee, timestamp, unspentOutputs)
+	key := bytes.Join([][]byte{
+		[]byte("MemPool-"),
+		transaction.Hash(),
+	}, []byte{})
+
+	if err := blockchain.DB.Put(key, transaction.EncodeTransaction(), write); err != nil {
+		log.Panic(err)
+	}
 }
