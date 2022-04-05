@@ -42,6 +42,16 @@ func CreateBlock(address []byte, index int, lastHash []byte, transactions []*Tra
 	return block
 }
 
+func (block *Block) LinkOutputs() {
+	for i, transaction := range block.Transactions {
+		for j, output := range transaction.Outputs {
+			output.Index = j
+			output.TransactionIndex = i
+			output.BlockId = block.Hash()
+		}
+	}
+}
+
 func (block *Block) LinkCoinbase() {
 	for i, transaction := range block.Transactions {
 		if transaction.IsCoinbase() {

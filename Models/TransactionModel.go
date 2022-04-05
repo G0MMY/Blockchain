@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	coinbaseAmount = 10
+	coinbaseAmount = 50
 )
 
 type Transaction struct {
@@ -20,7 +20,7 @@ type Transaction struct {
 }
 
 type Input struct {
-	output    *Output
+	Output    *Output
 	Signature []byte
 }
 
@@ -33,7 +33,7 @@ type Output struct {
 }
 
 type UnspentOutput struct {
-	outputs []*Output
+	Outputs []*Output
 }
 
 //use pub key hash
@@ -56,6 +56,47 @@ func CreateTransaction(to, from []byte, amount, amountRest, fee int, timestamp i
 	return &Transaction{inputs, outputs, timestamp, fee}
 }
 
+func insertTransaction(transactions []*Transaction, transaction *Transaction) []*Transaction {
+	for i, trans := range transactions {
+		if transaction.Fee > trans.Fee {
+			transactions = append(transactions[:i+1], transactions[i:]...)
+			transactions[i] = transaction
+			break
+		}
+	}
+
+	return transactions
+}
+
+func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int) []*Transaction {
+	var memPoolTransactions []*Transaction
+	if len(transactions) > 0 {
+		memPoolTransactions = append(memPoolTransactions, transactions[0])
+		i := 1
+
+		for i < len(transactions) {
+			if transactions[i].Timestamp < time.Now().Unix() {
+				//if ValidateTransaction(transactions[i]) {
+				if len(memPoolTransactions) < numberTransactions {
+					for j, transaction := range memPoolTransactions {
+						if transaction.Fee <= transactions[i].Fee {
+							memPoolTransactions = append(memPoolTransactions[:j+1], memPoolTransactions[j:]...)
+							memPoolTransactions[j] = transactions[i]
+							break
+						}
+					}
+				} else if memPoolTransactions[len(memPoolTransactions)-1].Fee < transactions[i].Fee {
+					memPoolTransactions = insertTransaction(memPoolTransactions, transactions[i])[:numberTransactions]
+				}
+				//}
+			}
+			i++
+		}
+	}
+
+	return memPoolTransactions
+}
+
 func (transaction *Transaction) Hash() []byte {
 	hash := sha256.Sum256(transaction.EncodeTransaction())
 
@@ -63,7 +104,7 @@ func (transaction *Transaction) Hash() []byte {
 }
 
 func (transaction *Transaction) IsCoinbase() bool {
-	if transaction.Fee == 0 && len(transaction.Inputs) == 1 && len(transaction.Outputs) == 1 && transaction.Inputs[0].output == nil {
+	if transaction.Fee == 0 && len(transaction.Inputs) == 1 && len(transaction.Outputs) == 1 && transaction.Inputs[0].Output.PublicKeyHash == nil {
 		return true
 	}
 
@@ -96,7 +137,7 @@ func DecodeTransaction(byteTransaction []byte) *Transaction {
 func (unspentOutputs *UnspentOutput) CreateInputs() []*Input {
 	var inputs []*Input
 
-	for _, output := range unspentOutputs.outputs {
+	for _, output := range unspentOutputs.Outputs {
 		inputs = append(inputs, &Input{output, []byte{}})
 	}
 
@@ -107,7 +148,7 @@ func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output,
 	var outputs []*Output
 	index := -1
 
-	for i, output := range unspentOutputs.outputs {
+	for i, output := range unspentOutputs.Outputs {
 		if amount > 0 {
 			outputs = append(outputs, output)
 			amount -= output.Amount
@@ -115,10 +156,13 @@ func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output,
 			index = i
 		}
 	}
-	rest := unspentOutputs.outputs[index:]
-	unspentOutputs.outputs = outputs
+	unspentOutputs.Outputs = outputs
 
-	return rest, amount
+	if index == -1 {
+		return nil, amount
+	}
+
+	return unspentOutputs.Outputs[index:], amount
 }
 
 func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
@@ -142,5 +186,3 @@ func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
 
 	return &output
 }
-
-
