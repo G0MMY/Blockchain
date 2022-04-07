@@ -26,8 +26,8 @@ func CreateGenesisBlock(address []byte) *Block {
 	coinbase := CreateCoinbase(address)
 
 	block := &Block{0, 0, time.Now().Unix(), CreateTree([]*Transaction{coinbase}), []byte{}, []*Transaction{coinbase}}
-	block.Proof()
 	block.LinkCoinbase()
+	block.Proof()
 
 	return block
 }
@@ -36,8 +36,9 @@ func CreateBlock(address []byte, index int, lastHash []byte, transactions []*Tra
 	coinbase := CreateCoinbase(address)
 
 	block := &Block{index, 0, time.Now().Unix(), tree, lastHash, append(transactions, coinbase)}
-	block.Proof()
 	block.LinkCoinbase()
+	block.LinkOutputs()
+	block.Proof()
 
 	return block
 }

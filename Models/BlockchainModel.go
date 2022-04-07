@@ -27,13 +27,13 @@ func InitBlockchain(address []byte) *Blockchain {
 		log.Panic(err)
 	}
 
-	res, err := db.Has([]byte("lastHash"), read)
+	hasLastHash, err := db.Has([]byte("lastHash"), read)
 
 	if err != nil {
 		log.Panic(err)
 	}
 
-	if res {
+	if hasLastHash {
 		lastHash, err := db.Get([]byte("lastHash"), read)
 
 		if err != nil {
@@ -107,6 +107,9 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	var read *opt.ReadOptions
 
 	if blockByte, err := blockchain.DB.Get(blockHash, read); err != nil {
+		if err.Error() == "leveldb: not found" {
+			return nil
+		}
 		log.Panic(err)
 	} else {
 		return DecodeBlock(blockByte)
@@ -115,17 +118,18 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	return nil
 }
 
-//add merkle root and transactions
-func (blockchain *Blockchain) CreateBlock(address []byte) {
+//add merkle root and transactions and transaction with fee to miner
+func (blockchain *Blockchain) CreateBlock(address []byte) *Block {
 	lastBlock := blockchain.GetLastBlock()
 	transactions := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), 5)
 
 	if lastBlock != nil {
 		block := CreateBlock(address, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
-		block.LinkOutputs()
 
 		blockchain.AddBlock(block)
+		return block
 	}
+	return nil
 }
 
 func (blockchain *Blockchain) AddBlock(block *Block) {
@@ -180,8 +184,6 @@ func (blockchain *Blockchain) GetUnspentOutputs(from []byte) *UnspentOutput {
 		from,
 	}, []byte{})
 
-	fmt.Printf("%x\n", key)
-
 	if outputs, err := blockchain.DB.Get(key, read); err != nil {
 		if err.Error() != "leveldb: not found" {
 			log.Panic()
@@ -200,8 +202,6 @@ func (blockchain *Blockchain) UpdateUnspentOutputs(unspentOuputs *UnspentOutput,
 		[]byte("UnspentOutput-"),
 		address,
 	}, []byte{})
-
-	fmt.Printf("%x\n", key)
 
 	if err := blockchain.DB.Put(key, unspentOuputs.EncodeUnspentOutput(), write); err != nil {
 		log.Panic(err)
@@ -227,7 +227,7 @@ func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int
 	var write *opt.WriteOptions
 
 	unspentOutputs := blockchain.GetUnspentOutputs(from)
-	if unspentOutputs == nil {
+	if unspentOutputs == nil || unspentOutputs.Outputs == nil {
 		log.Panic("You have no money buddy!")
 	}
 	outputRest, amountRest := unspentOutputs.GetOutputsForAmount(amount + fee)

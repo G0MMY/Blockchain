@@ -48,9 +48,11 @@ func CreateTransaction(to, from []byte, amount, amountRest, fee int, timestamp i
 	var outputs []*Output
 	inputs := unspentOutputs.CreateInputs()
 
-	if amountRest == 0 {
+	if amountRest < 0 {
 		outputs = append(outputs, &Output{[]byte{}, -1, -1, to, amount})
-		outputs = append(outputs, &Output{[]byte{}, -1, -1, from, amountRest})
+		outputs = append(outputs, &Output{[]byte{}, -1, -1, from, amountRest * -1})
+	} else if amountRest == 0 {
+		outputs = append(outputs, &Output{[]byte{}, -1, -1, to, amount})
 	}
 
 	return &Transaction{inputs, outputs, timestamp, fee}
@@ -68,6 +70,7 @@ func insertTransaction(transactions []*Transaction, transaction *Transaction) []
 	return transactions
 }
 
+//add validation
 func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int) []*Transaction {
 	var memPoolTransactions []*Transaction
 	if len(transactions) > 0 {
@@ -146,6 +149,7 @@ func (unspentOutputs *UnspentOutput) CreateInputs() []*Input {
 
 func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output, int) {
 	var outputs []*Output
+	rest := unspentOutputs.Outputs
 	index := -1
 
 	for i, output := range unspentOutputs.Outputs {
@@ -162,7 +166,7 @@ func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output,
 		return nil, amount
 	}
 
-	return unspentOutputs.Outputs[index:], amount
+	return rest[index:], amount
 }
 
 func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
