@@ -100,14 +100,24 @@ func getCheckSum(publicKeyHash []byte) []byte {
 	return secondHash[:checksumLength]
 }
 
-func (wallet *Wallet) GetAddress() []byte {
-	publicKeyHash := wallet.GetPublicKeyHash()
+func GetAddress(publicKey []byte) []byte {
+	publicKeyHash := GetPublicKeyHash(publicKey)
 	versionHash := append([]byte{version}, publicKeyHash...)
 	checkSum := getCheckSum(versionHash)
 	fullHash := append(versionHash, checkSum...)
 	address := base58.Encode(fullHash)
 
 	return []byte(address)
+}
+
+func GetPublicKeyHashFromAddress(address []byte) []byte {
+	decodedAddress := base58.Decode(string(address))
+
+	if len(decodedAddress) < checksumLength {
+		return []byte{}
+	}
+
+	return decodedAddress[1 : len(decodedAddress)-checksumLength]
 }
 
 func IsValidAddress(address []byte) bool {
@@ -126,8 +136,8 @@ func IsValidAddress(address []byte) bool {
 	return bytes.Compare(checkSum, targetCheckSum) == 0
 }
 
-func (wallet *Wallet) GetPublicKeyHash() []byte {
-	shaHash := sha256.Sum256(wallet.PublicKey)
+func GetPublicKeyHash(publicKey []byte) []byte {
+	shaHash := sha256.Sum256(publicKey)
 
 	hasher := ripemd160.New()
 	_, err := hasher.Write(shaHash[:])

@@ -20,6 +20,7 @@ type BlockchainIterator struct {
 }
 
 func InitBlockchain(address []byte) *Blockchain {
+	publicKeyHash := ValidateAddress(address)
 	var read *opt.ReadOptions
 	db, err := leveldb.OpenFile("./db", nil)
 
@@ -43,7 +44,7 @@ func InitBlockchain(address []byte) *Blockchain {
 		return &Blockchain{lastHash, db}
 	}
 
-	block := CreateGenesisBlock(address)
+	block := CreateGenesisBlock(publicKeyHash)
 	blockchain := &Blockchain{[]byte{}, db}
 	blockchain.AddBlock(block)
 
@@ -118,13 +119,14 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	return nil
 }
 
-//add merkle root and transactions and transaction with fee to miner
+//add merkle root and transaction with fee to miner
 func (blockchain *Blockchain) CreateBlock(address []byte) *Block {
+	pubKeyHash := ValidateAddress(address)
 	lastBlock := blockchain.GetLastBlock()
 	transactions := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), 5)
 
 	if lastBlock != nil {
-		block := CreateBlock(address, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
+		block := CreateBlock(pubKeyHash, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
 
 		blockchain.AddBlock(block)
 		return block
@@ -149,14 +151,13 @@ func (blockchain *Blockchain) AddBlock(block *Block) {
 	blockchain.LastHash = hash
 }
 
-//change from %s to %x when wallet
 func (blockchain *Blockchain) PersistUnspentOutputs(block *Block) {
 	var publicKeys []string
 	outputsPerPubKey := make(map[string][]*Output)
 
 	for _, transaction := range block.Transactions {
 		for _, output := range transaction.Outputs {
-			publicKeyString := fmt.Sprintf("%s", output.PublicKeyHash)
+			publicKeyString := fmt.Sprintf("%x", output.PublicKeyHash)
 			if _, ok := outputsPerPubKey[publicKeyString]; !ok {
 				publicKeys = append(publicKeys, publicKeyString)
 			}
@@ -168,10 +169,10 @@ func (blockchain *Blockchain) PersistUnspentOutputs(block *Block) {
 		publicKey := []byte(publicKeyString)
 		unspentOutputs := blockchain.GetUnspentOutputs(publicKey)
 		if unspentOutputs == nil {
-			blockchain.UpdateUnspentOutputs(&UnspentOutput{outputsPerPubKey[publicKeyString]}, publicKey)
+			blockchain.updateUnspentOutputs(&UnspentOutput{outputsPerPubKey[publicKeyString]}, publicKey)
 		} else {
 			unspentOutputs.Outputs = append(unspentOutputs.Outputs, outputsPerPubKey[publicKeyString]...)
-			blockchain.UpdateUnspentOutputs(unspentOutputs, publicKey)
+			blockchain.updateUnspentOutputs(unspentOutputs, publicKey)
 		}
 	}
 }
@@ -195,7 +196,7 @@ func (blockchain *Blockchain) GetUnspentOutputs(from []byte) *UnspentOutput {
 	return nil
 }
 
-func (blockchain *Blockchain) UpdateUnspentOutputs(unspentOuputs *UnspentOutput, address []byte) {
+func (blockchain *Blockchain) updateUnspentOutputs(unspentOuputs *UnspentOutput, address []byte) {
 	var write *opt.WriteOptions
 
 	key := bytes.Join([][]byte{
@@ -226,14 +227,17 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) {
 	var write *opt.WriteOptions
 
-	unspentOutputs := blockchain.GetUnspentOutputs(from)
+	fromHash := ValidateAddress(from)
+	toHash := ValidateAddress(to)
+
+	unspentOutputs := blockchain.GetUnspentOutputs(fromHash)
 	if unspentOutputs == nil || unspentOutputs.Outputs == nil {
 		log.Panic("You have no money buddy!")
 	}
 	outputRest, amountRest := unspentOutputs.GetOutputsForAmount(amount + fee)
-	blockchain.UpdateUnspentOutputs(&UnspentOutput{outputRest}, from)
+	blockchain.updateUnspentOutputs(&UnspentOutput{outputRest}, fromHash)
 
-	transaction := CreateTransaction(to, from, amount, amountRest, fee, timestamp, unspentOutputs)
+	transaction := CreateTransaction(toHash, fromHash, amount, amountRest, fee, timestamp, unspentOutputs)
 	key := bytes.Join([][]byte{
 		[]byte("MemPool-"),
 		transaction.Hash(),
