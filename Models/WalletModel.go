@@ -13,8 +13,6 @@ import (
 	"log"
 )
 
-//update PersistUnspentOutputs
-
 const (
 	checksumLength = 4
 	version        = byte(0x00)
@@ -146,4 +144,16 @@ func GetPublicKeyHash(publicKey []byte) []byte {
 	}
 
 	return hasher.Sum(nil)
+}
+
+func ValidateAddress(address []byte) []byte {
+	if IsValidPublicKey(address) {
+		return GetPublicKeyHash(address)
+	} else if IsValidAddress(address) {
+		return GetPublicKeyHashFromAddress(address)
+	} else {
+		log.Panic("Invalid address provided")
+	}
+
+	return []byte{}
 }

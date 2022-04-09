@@ -7,6 +7,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"log"
+	"os"
 )
 
 type Blockchain struct {
@@ -17,6 +18,39 @@ type Blockchain struct {
 type BlockchainIterator struct {
 	CurrentHash []byte
 	DB          *leveldb.DB
+}
+
+func InitTestBlockchain(address []byte) *Blockchain {
+	publicKeyHash := ValidateAddress(address)
+	var read *opt.ReadOptions
+
+	db, err := leveldb.OpenFile("./dbTest", nil)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	hasLastHash, err := db.Has([]byte("lastHash"), read)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	if hasLastHash {
+		err = os.RemoveAll("./dbTest")
+		if err != nil {
+			log.Panic(err)
+		}
+
+		db, err = leveldb.OpenFile("./dbTest", nil)
+		if err != nil {
+			log.Panic(err)
+		}
+	}
+
+	block := CreateGenesisBlock(publicKeyHash)
+	blockchain := &Blockchain{[]byte{}, db}
+	blockchain.addBlock(block)
+
+	return blockchain
 }
 
 func InitBlockchain(address []byte) *Blockchain {
@@ -46,7 +80,7 @@ func InitBlockchain(address []byte) *Blockchain {
 
 	block := CreateGenesisBlock(publicKeyHash)
 	blockchain := &Blockchain{[]byte{}, db}
-	blockchain.AddBlock(block)
+	blockchain.addBlock(block)
 
 	return blockchain
 }
@@ -128,13 +162,13 @@ func (blockchain *Blockchain) CreateBlock(address []byte) *Block {
 	if lastBlock != nil {
 		block := CreateBlock(pubKeyHash, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
 
-		blockchain.AddBlock(block)
+		blockchain.addBlock(block)
 		return block
 	}
 	return nil
 }
 
-func (blockchain *Blockchain) AddBlock(block *Block) {
+func (blockchain *Blockchain) addBlock(block *Block) {
 	var write *opt.WriteOptions
 	hash := block.Hash()
 
@@ -224,7 +258,7 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 	return transactions
 }
 
-func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) {
+func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) *Transaction {
 	var write *opt.WriteOptions
 
 	fromHash := ValidateAddress(from)
@@ -246,4 +280,6 @@ func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int
 	if err := blockchain.DB.Put(key, transaction.EncodeTransaction(), write); err != nil {
 		log.Panic(err)
 	}
+
+	return transaction
 }

@@ -190,15 +190,3 @@ func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
 
 	return &output
 }
-
-func ValidateAddress(address []byte) []byte {
-	if IsValidPublicKey(address) {
-		return GetPublicKeyHash(address)
-	} else if IsValidAddress(address) {
-		return GetPublicKeyHashFromAddress(address)
-	} else {
-		log.Panic("Invalid address provided")
-	}
-
-	return []byte{}
-}
