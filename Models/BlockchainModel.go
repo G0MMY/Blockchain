@@ -191,7 +191,7 @@ func (blockchain *Blockchain) PersistUnspentOutputs(block *Block) {
 
 	for _, transaction := range block.Transactions {
 		for _, output := range transaction.Outputs {
-			publicKeyString := fmt.Sprintf("%x", output.PublicKeyHash)
+			publicKeyString := fmt.Sprintf("%s", output.PublicKeyHash)
 			if _, ok := outputsPerPubKey[publicKeyString]; !ok {
 				publicKeys = append(publicKeys, publicKeyString)
 			}
@@ -211,13 +211,10 @@ func (blockchain *Blockchain) PersistUnspentOutputs(block *Block) {
 	}
 }
 
-func (blockchain *Blockchain) GetUnspentOutputs(from []byte) *UnspentOutput {
+func (blockchain *Blockchain) GetUnspentOutputs(address []byte) *UnspentOutput {
 	var read *opt.ReadOptions
 
-	key := bytes.Join([][]byte{
-		[]byte("UnspentOutput-"),
-		from,
-	}, []byte{})
+	key := GenerateUnspentOutputKey(address)
 
 	if outputs, err := blockchain.DB.Get(key, read); err != nil {
 		if err.Error() != "leveldb: not found" {
@@ -233,10 +230,7 @@ func (blockchain *Blockchain) GetUnspentOutputs(from []byte) *UnspentOutput {
 func (blockchain *Blockchain) updateUnspentOutputs(unspentOuputs *UnspentOutput, address []byte) {
 	var write *opt.WriteOptions
 
-	key := bytes.Join([][]byte{
-		[]byte("UnspentOutput-"),
-		address,
-	}, []byte{})
+	key := GenerateUnspentOutputKey(address)
 
 	if err := blockchain.DB.Put(key, unspentOuputs.EncodeUnspentOutput(), write); err != nil {
 		log.Panic(err)
@@ -258,17 +252,57 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 	return transactions
 }
 
+func (blockchain *Blockchain) GetAllUnspentOutputsKeys() [][]byte {
+	var read *opt.ReadOptions
+	var transactions [][]byte
+
+	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("UnspentOutput-")), read)
+
+	for iter.Next() {
+		byteTransaction := iter.Key()
+		transactions = append(transactions, byteTransaction)
+	}
+	iter.Release()
+
+	return transactions
+}
+func (blockchain *Blockchain) GetAllUnspentOutputs() *UnspentOutput {
+	var read *opt.ReadOptions
+	var transactions UnspentOutput
+
+	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("UnspentOutput-")), read)
+
+	for iter.Next() {
+		byteTransaction := iter.Value()
+		transactions.Outputs = append(transactions.Outputs, DecodeUnspentOutput(byteTransaction).Outputs...)
+	}
+	iter.Release()
+
+	return &transactions
+}
+
 func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) *Transaction {
+	if bytes.Compare(from, to) == 0 {
+		log.Panic("You can't send money to yourself")
+	}
 	var write *opt.WriteOptions
 
 	fromHash := ValidateAddress(from)
 	toHash := ValidateAddress(to)
+
+	g := blockchain.GetAllUnspentOutputs()
+	fmt.Println(g)
 
 	unspentOutputs := blockchain.GetUnspentOutputs(fromHash)
 	if unspentOutputs == nil || unspentOutputs.Outputs == nil {
 		log.Panic("You have no money buddy!")
 	}
 	outputRest, amountRest := unspentOutputs.GetOutputsForAmount(amount + fee)
+
+	if amountRest > 0 {
+		log.Panic("You don't have enough money")
+	}
+
 	blockchain.updateUnspentOutputs(&UnspentOutput{outputRest}, fromHash)
 
 	transaction := CreateTransaction(toHash, fromHash, amount, amountRest, fee, timestamp, unspentOutputs)

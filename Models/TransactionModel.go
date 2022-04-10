@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"log"
+	"sort"
 	"time"
 )
 
@@ -36,7 +37,6 @@ type UnspentOutput struct {
 	Outputs []*Output
 }
 
-//use pub key hash
 func CreateCoinbase(address []byte) *Transaction {
 	input := &Input{&Output{}, []byte{}}
 	output := &Output{[]byte{}, -1, 0, address, coinbaseAmount}
@@ -149,24 +149,57 @@ func (unspentOutputs *UnspentOutput) CreateInputs() []*Input {
 
 func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output, int) {
 	var outputs []*Output
-	rest := unspentOutputs.Outputs
-	index := -1
 
-	for i, output := range unspentOutputs.Outputs {
-		if amount > 0 {
-			outputs = append(outputs, output)
-			amount -= output.Amount
-		} else if index == -1 {
-			index = i
+	if len(unspentOutputs.Outputs) == 0 {
+		log.Panic("No unspent outputs to choose from")
+	}
+
+	sort.Slice(unspentOutputs.Outputs, func(i, j int) bool {
+		return unspentOutputs.Outputs[i].Amount > unspentOutputs.Outputs[j].Amount
+	})
+
+	rest := unspentOutputs.Outputs
+
+	if amount > unspentOutputs.Outputs[0].Amount {
+		index := -1
+		for i, output := range unspentOutputs.Outputs {
+			if amount > 0 {
+				outputs = append(outputs, output)
+				amount -= output.Amount
+			} else if index == -1 {
+				index = i
+				break
+			}
+		}
+		if index == -1 && amount > 0 {
+			return nil, amount
+		}
+		rest = rest[index:]
+	} else {
+		for i, output := range unspentOutputs.Outputs {
+			if amount < output.Amount && i < len(unspentOutputs.Outputs)-1 {
+				if amount > unspentOutputs.Outputs[i+1].Amount {
+					outputs = append(outputs, output)
+					amount -= output.Amount
+					rest = append(rest[:i], rest[i+1:]...)
+					break
+				}
+			} else {
+				outputs = append(outputs, output)
+				amount -= output.Amount
+				rest = append(rest[:i], rest[i+1:]...)
+				break
+			}
 		}
 	}
-	unspentOutputs.Outputs = outputs
 
-	if index == -1 {
+	if len(rest) == len(unspentOutputs.Outputs) {
 		return nil, amount
 	}
 
-	return rest[index:], amount
+	unspentOutputs.Outputs = outputs
+
+	return rest, amount
 }
 
 func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
@@ -178,6 +211,13 @@ func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
 	}
 
 	return buffer.Bytes()
+}
+
+func GenerateUnspentOutputKey(address []byte) []byte {
+	return bytes.Join([][]byte{
+		[]byte("UnspentOutput-"),
+		address,
+	}, []byte{})
 }
 
 func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {

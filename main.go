@@ -29,8 +29,11 @@ func main() {
 	blockchain := Models.InitBlockchain(wallet1.PublicKey)
 
 	blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 5, 5, time.Now().Unix())
-	//blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 5, 5, time.Now().Unix())
-	//blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 5, 5, time.Now().Unix())
+	blockchain.CreateBlock(wallet2.PublicKey)
+
+	blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 5, 5, time.Now().Unix())
+	blockchain.CreateTransaction(wallet2.PublicKey, wallet1.PublicKey, 5, 5, time.Now().Unix())
+	blockchain.CreateTransaction(wallet2.PublicKey, wallet1.PublicKey, 4, 1, time.Now().Unix())
 
 	blockchain.CreateBlock(wallet2.PublicKey)
 
