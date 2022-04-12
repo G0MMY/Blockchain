@@ -10,6 +10,10 @@ import (
 	"os"
 )
 
+var (
+	NumberOfTransactions = 5
+)
+
 type Blockchain struct {
 	LastHash []byte
 	DB       *leveldb.DB
@@ -24,7 +28,7 @@ func InitTestBlockchain(address []byte) *Blockchain {
 	publicKeyHash := ValidateAddress(address)
 	var read *opt.ReadOptions
 
-	db, err := leveldb.OpenFile("./dbTest", nil)
+	db, err := leveldb.OpenFile("./testing/dbTest", nil)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -35,12 +39,12 @@ func InitTestBlockchain(address []byte) *Blockchain {
 	}
 
 	if hasLastHash {
-		err = os.RemoveAll("./dbTest")
+		err = os.RemoveAll("./testing/dbTest")
 		if err != nil {
 			log.Panic(err)
 		}
 
-		db, err = leveldb.OpenFile("./dbTest", nil)
+		db, err = leveldb.OpenFile("./testing/dbTest", nil)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -153,11 +157,13 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	return nil
 }
 
-//add merkle root and transaction with fee to miner
+//add merkle root and transaction with fee to miner chnage number transaction (test too)
 func (blockchain *Blockchain) CreateBlock(address []byte) *Block {
 	pubKeyHash := ValidateAddress(address)
 	lastBlock := blockchain.GetLastBlock()
-	transactions := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), 5)
+	transactions := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), NumberOfTransactions)
+
+	blockchain.updateMemPoolTransactions(transactions)
 
 	if lastBlock != nil {
 		block := CreateBlock(pubKeyHash, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
@@ -227,6 +233,21 @@ func (blockchain *Blockchain) GetUnspentOutputs(address []byte) *UnspentOutput {
 	return nil
 }
 
+func (blockchain *Blockchain) updateMemPoolTransactions(memPoolTransactions []*Transaction) {
+	var write *opt.WriteOptions
+
+	for _, transaction := range memPoolTransactions {
+		key := bytes.Join([][]byte{
+			[]byte("MemPool-"),
+			transaction.Hash(),
+		}, []byte{})
+
+		if err := blockchain.DB.Delete(key, write); err != nil {
+			log.Panic(err)
+		}
+	}
+}
+
 func (blockchain *Blockchain) updateUnspentOutputs(unspentOuputs *UnspentOutput, address []byte) {
 	var write *opt.WriteOptions
 
@@ -289,9 +310,6 @@ func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int
 
 	fromHash := ValidateAddress(from)
 	toHash := ValidateAddress(to)
-
-	g := blockchain.GetAllUnspentOutputs()
-	fmt.Println(g)
 
 	unspentOutputs := blockchain.GetUnspentOutputs(fromHash)
 	if unspentOutputs == nil || unspentOutputs.Outputs == nil {

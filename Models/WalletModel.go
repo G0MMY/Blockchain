@@ -73,22 +73,28 @@ func EncodePrivateKey(private *ecdsa.PrivateKey) []byte {
 	return privateKey
 }
 
-func (wallet *Wallet) DecodePublicKey() crypto.PublicKey {
-	publicKey, err := x509.ParsePKIXPublicKey(wallet.PublicKey)
+func DecodePublicKey(publicKey []byte) crypto.PublicKey {
+	if !IsValidPublicKey(publicKey) {
+		log.Panic("Invalid Public Key")
+	}
+	key, err := x509.ParsePKIXPublicKey(publicKey)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	return publicKey.(crypto.PublicKey)
+	return key.(crypto.PublicKey)
 }
 
-func (wallet *Wallet) DecodePrivateKey() *ecdsa.PrivateKey {
-	privateKey, err := x509.ParseECPrivateKey(wallet.PrivateKey)
+func DecodePrivateKey(privateKey []byte) *ecdsa.PrivateKey {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid Private Key")
+	}
+	key, err := x509.ParseECPrivateKey(privateKey)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	return privateKey
+	return key
 }
 
 func getCheckSum(publicKeyHash []byte) []byte {

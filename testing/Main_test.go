@@ -50,24 +50,92 @@ func TestCreateBlock(t *testing.T) {
 	}
 }
 
+//check signature
 func TestCreateTransaction(t *testing.T) {
 	if blockchain == nil {
 		t.Error("blockchain in not initialized")
 	}
 	unspentOutputs := blockchain.GetUnspentOutputs(Models.ValidateAddress(wallet1.PublicKey))
-	t.Errorf("%d", len(unspentOutputs.Outputs))
-	transaction1 := blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 1, 5, time.Now().Unix())
-	pubKeyHash := Models.GetPublicKeyHash(wallet1.PublicKey)
-
-	for _, output := range transaction1.Outputs {
-		if bytes.Compare(output.PublicKeyHash, pubKeyHash) != 0 {
-			t.Errorf("The publicKeyHash in output %d is invalid", output.Index)
-		}
-	}
-
+	transaction := blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 1, 5, time.Now().Unix())
 	unspentOutputsAfter := blockchain.GetUnspentOutputs(wallet1.PublicKey)
 
-	if len(unspentOutputs.Outputs) <= len(unspentOutputsAfter.Outputs) {
-		t.Error("The unspent outputs didin't change")
+	if unspentOutputs != nil && unspentOutputsAfter != nil {
+		if len(unspentOutputs.Outputs) <= len(unspentOutputsAfter.Outputs) {
+			t.Error("The unspent outputs didin't change")
+		}
 	}
+	for _, input := range transaction.Inputs {
+		if input.Output == nil {
+			t.Errorf("The input isn't linked to an output")
+		} else if bytes.Compare(input.Output.PublicKeyHash, Models.ValidateAddress(wallet1.PublicKey)) != 0 {
+			t.Errorf("There is an input that dosen't have the right publicKey hash")
+		}
+	}
+}
+
+func TestTransactionsInBlock(t *testing.T) {
+	if blockchain == nil {
+		t.Error("blockchain in not initialized")
+	}
+	memPool := blockchain.GetMemPoolTransactions()
+
+	if memPool == nil || len(memPool) == 0 {
+		t.Error("There are no transactions")
+	}
+
+	block := blockchain.CreateBlock(wallet1.PublicKey)
+	if len(block.Transactions) != len(memPool)+1 {
+		t.Error("Transaction missing")
+	}
+}
+
+func TestMultipleTransactions(t *testing.T) {
+	blockchain.DB.Close()
+	blockchain = Models.InitTestBlockchain(wallet1.PublicKey)
+	i := 0
+	for i < Models.NumberOfTransactions*2 {
+		blockchain.CreateBlock(wallet1.PublicKey)
+		i += 1
+	}
+	i = 0
+	for i < Models.NumberOfTransactions*2 {
+		blockchain.CreateTransaction(wallet1.PublicKey, wallet2.PublicKey, 30, i, time.Now().Unix())
+		i += 1
+	}
+
+	block1 := blockchain.CreateBlock(wallet2.PublicKey)
+	block2 := blockchain.CreateBlock(wallet2.PublicKey)
+	if len(block1.Transactions) != Models.NumberOfTransactions {
+		t.Errorf("The block 1 has %d transactions but needed %d", len(block1.Transactions), Models.NumberOfTransactions)
+	} else if len(block2.Transactions) != Models.NumberOfTransactions {
+		t.Errorf("The block 2 has %d transactions but needed %d", len(block2.Transactions), Models.NumberOfTransactions)
+	}
+
+	target1 := 0
+	feeBlock1 := 0
+	feeBlock2 := 0
+	for m, transaction := range block1.Transactions {
+		if m != len(block1.Transactions)-1 {
+			target1 += Models.NumberOfTransactions*2 - m - 1
+		}
+		feeBlock1 += transaction.Fee
+	}
+
+	target2 := 0
+	for l, transaction := range block2.Transactions {
+		if l != len(block1.Transactions)-1 {
+			target2 += Models.NumberOfTransactions - l
+		}
+		feeBlock2 += transaction.Fee
+	}
+
+	if feeBlock1 != target1 {
+		t.Error("The block 1 dosen't have the right transactions")
+	} else if feeBlock2 != target2 {
+		t.Error("The block 2 dosen't have the right transactions")
+	}
+}
+
+func TestEnd(t *testing.T) {
+	blockchain.DB.Close()
 }

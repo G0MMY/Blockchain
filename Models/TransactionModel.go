@@ -2,8 +2,11 @@ package Models
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
+	"fmt"
 	"log"
 	"sort"
 	"time"
@@ -58,42 +61,37 @@ func CreateTransaction(to, from []byte, amount, amountRest, fee int, timestamp i
 	return &Transaction{inputs, outputs, timestamp, fee}
 }
 
-func insertTransaction(transactions []*Transaction, transaction *Transaction) []*Transaction {
-	for i, trans := range transactions {
-		if transaction.Fee > trans.Fee {
-			transactions = append(transactions[:i+1], transactions[i:]...)
-			transactions[i] = transaction
-			break
-		}
-	}
-
-	return transactions
-}
+//func insertTransaction(transactions []*Transaction, transaction *Transaction) []*Transaction {
+//	for i, trans := range transactions {
+//		if transaction.Fee > trans.Fee {
+//			transactions = append(transactions[:i+1], transactions[i:]...)
+//			transactions[i] = transaction
+//			break
+//		}
+//	}
+//
+//	return transactions
+//}
 
 //add validation
 func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int) []*Transaction {
 	var memPoolTransactions []*Transaction
-	if len(transactions) > 0 {
-		memPoolTransactions = append(memPoolTransactions, transactions[0])
-		i := 1
 
+	if len(transactions) > 0 {
+		sort.Slice(transactions, func(i, j int) bool {
+			return transactions[i].Fee > transactions[j].Fee
+		})
+
+		i := 0
 		for i < len(transactions) {
-			if transactions[i].Timestamp < time.Now().Unix() {
-				//if ValidateTransaction(transactions[i]) {
-				if len(memPoolTransactions) < numberTransactions {
-					for j, transaction := range memPoolTransactions {
-						if transaction.Fee <= transactions[i].Fee {
-							memPoolTransactions = append(memPoolTransactions[:j+1], memPoolTransactions[j:]...)
-							memPoolTransactions[j] = transactions[i]
-							break
-						}
-					}
-				} else if memPoolTransactions[len(memPoolTransactions)-1].Fee < transactions[i].Fee {
-					memPoolTransactions = insertTransaction(memPoolTransactions, transactions[i])[:numberTransactions]
+			if transactions[i].Timestamp <= time.Now().Unix() {
+				if len(memPoolTransactions) < numberTransactions-1 {
+					memPoolTransactions = append(memPoolTransactions, transactions[i])
+				} else {
+					break
 				}
-				//}
 			}
-			i++
+			i += 1
 		}
 	}
 
@@ -112,6 +110,33 @@ func (transaction *Transaction) IsCoinbase() bool {
 	}
 
 	return false
+}
+
+func (transaction *Transaction) Sign(privateKey []byte) {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid Private Key")
+	}
+
+	privKey := DecodePrivateKey(privateKey)
+
+	for i, input := range transaction.Inputs {
+		if input.Output == nil {
+			log.Panic("Can't sign transaction, invalid input")
+		}
+		signature, err := privKey.Sign(rand.Reader, HashInt(input.Output.Amount), crypto.SHA256)
+
+		if err != nil {
+			log.Panic(err)
+		}
+
+		transaction.Inputs[i].Signature = signature
+	}
+}
+
+func HashInt(value int) []byte {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%d", value)))
+
+	return hash[:]
 }
 
 func (transaction *Transaction) EncodeTransaction() []byte {
