@@ -24,8 +24,10 @@ type BlockchainIterator struct {
 	DB          *leveldb.DB
 }
 
-func InitTestBlockchain(address []byte) *Blockchain {
-	publicKeyHash := ValidateAddress(address)
+func InitTestBlockchain(privateKey []byte) *Blockchain {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
 	var read *opt.ReadOptions
 
 	db, err := leveldb.OpenFile("./testing/dbTest", nil)
@@ -50,15 +52,17 @@ func InitTestBlockchain(address []byte) *Blockchain {
 		}
 	}
 
-	block := CreateGenesisBlock(publicKeyHash)
+	block := CreateGenesisBlock(privateKey)
 	blockchain := &Blockchain{[]byte{}, db}
 	blockchain.addBlock(block)
 
 	return blockchain
 }
 
-func InitBlockchain(address []byte) *Blockchain {
-	publicKeyHash := ValidateAddress(address)
+func InitBlockchain(privateKey []byte) *Blockchain {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
 	var read *opt.ReadOptions
 	db, err := leveldb.OpenFile("./db", nil)
 
@@ -82,7 +86,7 @@ func InitBlockchain(address []byte) *Blockchain {
 		return &Blockchain{lastHash, db}
 	}
 
-	block := CreateGenesisBlock(publicKeyHash)
+	block := CreateGenesisBlock(privateKey)
 	blockchain := &Blockchain{[]byte{}, db}
 	blockchain.addBlock(block)
 
@@ -157,16 +161,18 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	return nil
 }
 
-//add merkle root and transaction with fee to miner chnage number transaction (test too)
-func (blockchain *Blockchain) CreateBlock(address []byte) *Block {
-	pubKeyHash := ValidateAddress(address)
+//add merkle root
+func (blockchain *Blockchain) CreateBlock(privateKey []byte) *Block {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
 	lastBlock := blockchain.GetLastBlock()
-	transactions := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), NumberOfTransactions)
+	transactions, transactionsHash := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), NumberOfTransactions, privateKey)
 
-	blockchain.updateMemPoolTransactions(transactions)
+	blockchain.updateMemPoolTransactions(transactionsHash)
 
 	if lastBlock != nil {
-		block := CreateBlock(pubKeyHash, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
+		block := CreateBlock(privateKey, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
 
 		blockchain.addBlock(block)
 		return block
@@ -233,13 +239,13 @@ func (blockchain *Blockchain) GetUnspentOutputs(address []byte) *UnspentOutput {
 	return nil
 }
 
-func (blockchain *Blockchain) updateMemPoolTransactions(memPoolTransactions []*Transaction) {
+func (blockchain *Blockchain) updateMemPoolTransactions(memPoolTransactions [][]byte) {
 	var write *opt.WriteOptions
 
-	for _, transaction := range memPoolTransactions {
+	for _, hash := range memPoolTransactions {
 		key := bytes.Join([][]byte{
 			[]byte("MemPool-"),
-			transaction.Hash(),
+			hash,
 		}, []byte{})
 
 		if err := blockchain.DB.Delete(key, write); err != nil {
@@ -302,14 +308,19 @@ func (blockchain *Blockchain) GetAllUnspentOutputs() *UnspentOutput {
 	return &transactions
 }
 
-func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int, timestamp int64) *Transaction {
-	if bytes.Compare(from, to) == 0 {
-		log.Panic("You can't send money to yourself")
-	}
+func (blockchain *Blockchain) CreateTransaction(privateKey, to []byte, amount, fee int, timestamp int64) *Transaction {
 	var write *opt.WriteOptions
 
-	fromHash := ValidateAddress(from)
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
+
+	fromHash := ValidateAddress(GetPublicKeyFromPrivateKey(privateKey))
 	toHash := ValidateAddress(to)
+
+	if bytes.Compare(fromHash, toHash) == 0 {
+		log.Panic("You can't send money to yourself")
+	}
 
 	unspentOutputs := blockchain.GetUnspentOutputs(fromHash)
 	if unspentOutputs == nil || unspentOutputs.Outputs == nil {
@@ -323,7 +334,7 @@ func (blockchain *Blockchain) CreateTransaction(from, to []byte, amount, fee int
 
 	blockchain.updateUnspentOutputs(&UnspentOutput{outputRest}, fromHash)
 
-	transaction := CreateTransaction(toHash, fromHash, amount, amountRest, fee, timestamp, unspentOutputs)
+	transaction := CreateTransaction(toHash, fromHash, privateKey, amount, amountRest, fee, timestamp, unspentOutputs)
 	key := bytes.Join([][]byte{
 		[]byte("MemPool-"),
 		transaction.Hash(),

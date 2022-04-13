@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"fmt"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"golang.org/x/crypto/ripemd160"
 	"log"
@@ -73,7 +74,7 @@ func EncodePrivateKey(private *ecdsa.PrivateKey) []byte {
 	return privateKey
 }
 
-func DecodePublicKey(publicKey []byte) crypto.PublicKey {
+func DecodePublicKey(publicKey []byte) *ecdsa.PublicKey {
 	if !IsValidPublicKey(publicKey) {
 		log.Panic("Invalid Public Key")
 	}
@@ -82,7 +83,7 @@ func DecodePublicKey(publicKey []byte) crypto.PublicKey {
 		log.Panic(err)
 	}
 
-	return key.(crypto.PublicKey)
+	return key.(*ecdsa.PublicKey)
 }
 
 func DecodePrivateKey(privateKey []byte) *ecdsa.PrivateKey {
@@ -140,6 +141,16 @@ func IsValidAddress(address []byte) bool {
 	return bytes.Compare(checkSum, targetCheckSum) == 0
 }
 
+func GetPublicKeyFromPrivateKey(privateKey []byte) []byte {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
+
+	priv := DecodePrivateKey(privateKey)
+
+	return EncodePublicKey(priv.Public())
+}
+
 func GetPublicKeyHash(publicKey []byte) []byte {
 	shaHash := sha256.Sum256(publicKey)
 
@@ -162,4 +173,34 @@ func ValidateAddress(address []byte) []byte {
 	}
 
 	return []byte{}
+}
+
+func Sign(amount int, privateKey []byte) []byte {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
+
+	priv := DecodePrivateKey(privateKey)
+
+	signature, err := ecdsa.SignASN1(rand.Reader, priv, HashInt(amount))
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return signature
+}
+
+func HashInt(value int) []byte {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%d", value)))
+
+	return hash[:]
+}
+
+func ValidateSignature(amount int, publicKey, signature []byte) bool {
+	if !IsValidPublicKey(publicKey) {
+		log.Panic("Invalid public key")
+	}
+
+	return ecdsa.VerifyASN1(DecodePublicKey(publicKey), HashInt(amount), signature)
 }

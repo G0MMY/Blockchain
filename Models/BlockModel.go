@@ -22,18 +22,23 @@ type Block struct {
 	Transactions []*Transaction
 }
 
-func CreateGenesisBlock(address []byte) *Block {
-	coinbase := CreateCoinbase(address)
+func CreateGenesisBlock(privateKey []byte) *Block {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
+	coinbase := CreateCoinbase(privateKey)
 
-	block := &Block{0, 0, time.Now().Unix(), CreateTree([]*Transaction{coinbase}), []byte{}, []*Transaction{coinbase}}
+	//CreateTree([]*Transaction{coinbase})
+
+	block := &Block{0, 0, time.Now().Unix(), &Tree{}, []byte{}, []*Transaction{coinbase}}
 	block.LinkCoinbase()
 	block.Proof()
 
 	return block
 }
 
-func CreateBlock(address []byte, index int, lastHash []byte, transactions []*Transaction, tree *Tree) *Block {
-	coinbase := CreateCoinbase(address)
+func CreateBlock(privateKey []byte, index int, lastHash []byte, transactions []*Transaction, tree *Tree) *Block {
+	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{index, 0, time.Now().Unix(), tree, lastHash, append(transactions, coinbase)}
 	block.LinkCoinbase()

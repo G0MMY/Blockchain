@@ -2,11 +2,8 @@ package Models
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
-	"fmt"
 	"log"
 	"sort"
 	"time"
@@ -26,6 +23,7 @@ type Transaction struct {
 type Input struct {
 	Output    *Output
 	Signature []byte
+	PublicKey []byte
 }
 
 type Output struct {
@@ -40,16 +38,16 @@ type UnspentOutput struct {
 	Outputs []*Output
 }
 
-func CreateCoinbase(address []byte) *Transaction {
-	input := &Input{&Output{}, []byte{}}
-	output := &Output{[]byte{}, -1, 0, address, coinbaseAmount}
+func CreateCoinbase(privateKey []byte) *Transaction {
+	input := &Input{&Output{Amount: coinbaseAmount}, Sign(coinbaseAmount, privateKey), GetPublicKeyFromPrivateKey(privateKey)}
+	output := &Output{[]byte{}, -1, 0, ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), coinbaseAmount}
 
 	return &Transaction{[]*Input{input}, []*Output{output}, time.Now().Unix(), 0}
 }
 
-func CreateTransaction(to, from []byte, amount, amountRest, fee int, timestamp int64, unspentOutputs *UnspentOutput) *Transaction {
+func CreateTransaction(to, from, privateKey []byte, amount, amountRest, fee int, timestamp int64, unspentOutputs *UnspentOutput) *Transaction {
 	var outputs []*Output
-	inputs := unspentOutputs.CreateInputs()
+	inputs := unspentOutputs.CreateInputs(privateKey)
 
 	if amountRest < 0 {
 		outputs = append(outputs, &Output{[]byte{}, -1, -1, to, amount})
@@ -61,21 +59,12 @@ func CreateTransaction(to, from []byte, amount, amountRest, fee int, timestamp i
 	return &Transaction{inputs, outputs, timestamp, fee}
 }
 
-//func insertTransaction(transactions []*Transaction, transaction *Transaction) []*Transaction {
-//	for i, trans := range transactions {
-//		if transaction.Fee > trans.Fee {
-//			transactions = append(transactions[:i+1], transactions[i:]...)
-//			transactions[i] = transaction
-//			break
-//		}
-//	}
-//
-//	return transactions
-//}
-
-//add validation
-func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int) []*Transaction {
+func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int, privateKey []byte) ([]*Transaction, [][]byte) {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
 	var memPoolTransactions []*Transaction
+	var transactionsHash [][]byte
 
 	if len(transactions) > 0 {
 		sort.Slice(transactions, func(i, j int) bool {
@@ -86,6 +75,9 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 		for i < len(transactions) {
 			if transactions[i].Timestamp <= time.Now().Unix() {
 				if len(memPoolTransactions) < numberTransactions-1 {
+					transactionsHash = append(transactionsHash, transactions[i].Hash())
+					transactions[i].addFeeOutput(privateKey)
+					transactions[i].ValidateTransaction()
 					memPoolTransactions = append(memPoolTransactions, transactions[i])
 				} else {
 					break
@@ -95,7 +87,33 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 		}
 	}
 
-	return memPoolTransactions
+	return memPoolTransactions, transactionsHash
+}
+
+func (transaction *Transaction) addFeeOutput(privateKey []byte) {
+	if !IsValidPrivateKey(privateKey) {
+		log.Panic("Invalid private key")
+	}
+	transaction.Outputs = append(transaction.Outputs, &Output{[]byte{}, -1, -1, ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), transaction.Fee})
+}
+
+func (transaction *Transaction) ValidateTransaction() {
+	inputAmount := 0
+	for _, input := range transaction.Inputs {
+		inputAmount += input.Output.Amount
+		if !ValidateSignature(input.Output.Amount, input.PublicKey, input.Signature) {
+			log.Panic("Invalid signature")
+		}
+	}
+
+	outputAmount := 0
+	for _, output := range transaction.Outputs {
+		outputAmount += output.Amount
+	}
+
+	if inputAmount != outputAmount {
+		log.Panic("Not all money is there")
+	}
 }
 
 func (transaction *Transaction) Hash() []byte {
@@ -110,33 +128,6 @@ func (transaction *Transaction) IsCoinbase() bool {
 	}
 
 	return false
-}
-
-func (transaction *Transaction) Sign(privateKey []byte) {
-	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid Private Key")
-	}
-
-	privKey := DecodePrivateKey(privateKey)
-
-	for i, input := range transaction.Inputs {
-		if input.Output == nil {
-			log.Panic("Can't sign transaction, invalid input")
-		}
-		signature, err := privKey.Sign(rand.Reader, HashInt(input.Output.Amount), crypto.SHA256)
-
-		if err != nil {
-			log.Panic(err)
-		}
-
-		transaction.Inputs[i].Signature = signature
-	}
-}
-
-func HashInt(value int) []byte {
-	hash := sha256.Sum256([]byte(fmt.Sprintf("%d", value)))
-
-	return hash[:]
 }
 
 func (transaction *Transaction) EncodeTransaction() []byte {
@@ -161,12 +152,11 @@ func DecodeTransaction(byteTransaction []byte) *Transaction {
 	return &transaction
 }
 
-//add signature
-func (unspentOutputs *UnspentOutput) CreateInputs() []*Input {
+func (unspentOutputs *UnspentOutput) CreateInputs(privateKey []byte) []*Input {
 	var inputs []*Input
 
 	for _, output := range unspentOutputs.Outputs {
-		inputs = append(inputs, &Input{output, []byte{}})
+		inputs = append(inputs, &Input{output, Sign(output.Amount, privateKey), GetPublicKeyFromPrivateKey(privateKey)})
 	}
 
 	return inputs

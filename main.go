@@ -17,24 +17,40 @@ package main
 
 import (
 	"blockchain/Models"
-	"fmt"
 )
 
 func main() {
 	//cmd.Execute()
 	wallet1 := Models.CreateWallet()
+	//wallet2 := Models.CreateWallet()
 
-	blockchain := Models.InitBlockchain(wallet1.PublicKey)
+	blockchain := Models.InitBlockchain(wallet1.PrivateKey)
+	//blockchain.CreateBlock(wallet1.PrivateKey)
+	//blockchain.CreateBlock(wallet1.PrivateKey)
+	//blockchain.CreateBlock(wallet1.PrivateKey)
+	//blockchain.CreateBlock(wallet1.PrivateKey)
+	//
+	//blockchain.CreateTransaction(wallet1.PrivateKey, wallet2.PublicKey, 10, 10, time.Now().Unix())
+	//blockchain.CreateTransaction(wallet1.PrivateKey, wallet2.PublicKey, 10, 10, time.Now().Unix())
+	//blockchain.CreateTransaction(wallet1.PrivateKey, wallet2.PublicKey, 10, 10, time.Now().Unix())
+	//blockchain.CreateTransaction(wallet1.PrivateKey, wallet2.PublicKey, 10, 10, time.Now().Unix())
+	//blockchain.CreateTransaction(wallet1.PrivateKey, wallet2.PublicKey, 10, 10, time.Now().Unix())
 
-	chain := blockchain.GetBlockchain()
+	t := blockchain.GetMemPoolTransactions()
 
-	for _, block := range chain {
-		fmt.Printf("block height: %d\n", block.Index)
-		fmt.Printf("block hash: %x\n", block.Hash())
-		fmt.Println()
-	}
+	Models.CreateTree(t)
 
-	blockchain.DB.Close()
+	//blockchain.CreateBlock(wallet1.PrivateKey)
+	//
+	//chain := blockchain.GetBlockchain()
+	//
+	//for _, block := range chain {
+	//	fmt.Printf("block height: %d\n", block.Index)
+	//	fmt.Printf("block hash: %x\n", block.Hash())
+	//	fmt.Println()
+	//}
+	//
+	//blockchain.DB.Close()
 }
 
 //export PATH=$PATH:/home/maxim/go/bin
