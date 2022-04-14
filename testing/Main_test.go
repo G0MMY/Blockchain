@@ -29,7 +29,6 @@ func TestInitBlockchain(t *testing.T) {
 	}
 }
 
-//add checks
 func TestCreateBlock(t *testing.T) {
 	if blockchain == nil {
 		t.Error("blockchain in not initialized")
@@ -38,19 +37,26 @@ func TestCreateBlock(t *testing.T) {
 	block := blockchain.CreateBlock(wallet1.PrivateKey)
 
 	if bytes.Compare(blockchain.LastHash, block.Hash()) != 0 {
-		t.Error("The blockchain lastHash asn't been updated properly")
+		t.Error("The blockchain lastHash hasn't been updated properly")
 	} else if bytes.Compare(lastHash, block.PreviousHash) != 0 {
-		t.Error("The new block dosen't have the right previous hash")
+		t.Error("The new block doesn't have the right previous hash")
 	} else if len(block.Transactions) != 1 {
 		t.Errorf("The block as %d transactions instead of 1", len(block.Transactions))
 	} else if len(block.Transactions[0].Outputs) != 1 {
 		t.Errorf("The block as %d transaction outputs instead of 1", len(block.Transactions[0].Outputs))
 	} else if len(block.Transactions[0].Inputs) != 1 {
 		t.Errorf("The block as %d transaction inputs instead of 1", len(block.Transactions[0].Inputs))
+	} else if block.MerkleRoot == nil {
+		t.Error("The block has no merkle root")
+	} else if !block.MerkleTree.CheckTree(block.Transactions) {
+		t.Error("Merkle tree or transactions are invalid")
+	} else if bytes.Compare(block.MerkleRoot, block.MerkleTree.RootNode.Data) != 0 {
+		t.Error("The merkle tree root is not the same as the block merkle root")
+	} else if !block.ValidateProof() {
+		t.Error("The block proof isn't good")
 	}
 }
 
-//check signature
 func TestCreateTransaction(t *testing.T) {
 	if blockchain == nil {
 		t.Error("blockchain in not initialized")
@@ -61,7 +67,7 @@ func TestCreateTransaction(t *testing.T) {
 
 	if unspentOutputs != nil && unspentOutputsAfter != nil {
 		if len(unspentOutputs.Outputs) <= len(unspentOutputsAfter.Outputs) {
-			t.Error("The unspent outputs didin't change")
+			t.Error("The unspent outputs didn't change")
 		}
 	}
 	for _, input := range transaction.Inputs {
@@ -69,6 +75,8 @@ func TestCreateTransaction(t *testing.T) {
 			t.Errorf("The input isn't linked to an output")
 		} else if bytes.Compare(input.Output.PublicKeyHash, Models.ValidateAddress(wallet1.PublicKey)) != 0 {
 			t.Errorf("There is an input that dosen't have the right publicKey hash")
+		} else if !Models.ValidateSignature(input.Output.Amount, input.PublicKey, input.Signature) {
+			t.Error("The transaction isn't signed properly")
 		}
 	}
 }
@@ -131,6 +139,10 @@ func TestMultipleTransactions(t *testing.T) {
 		t.Errorf("The block 1 has %d transactions but needed %d", len(block1.Transactions), Models.NumberOfTransactions)
 	} else if len(block2.Transactions) != Models.NumberOfTransactions {
 		t.Errorf("The block 2 has %d transactions but needed %d", len(block2.Transactions), Models.NumberOfTransactions)
+	} else if !block1.MerkleTree.CheckTree(block1.Transactions) {
+		t.Error("Invalid merkle tree or transactions in block 1")
+	} else if !block2.MerkleTree.CheckTree(block2.Transactions) {
+		t.Error("Invalid merkle tree or transactions in block 2")
 	}
 
 	target1 := 0
@@ -152,9 +164,9 @@ func TestMultipleTransactions(t *testing.T) {
 	}
 
 	if feeBlock1 != target1 {
-		t.Error("The block 1 dosen't have the right transactions")
+		t.Error("The block 1 doesn't have the right transactions")
 	} else if feeBlock2 != target2 {
-		t.Error("The block 2 dosen't have the right transactions")
+		t.Error("The block 2 doesn't have the right transactions")
 	}
 }
 

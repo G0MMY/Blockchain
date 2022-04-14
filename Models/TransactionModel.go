@@ -152,32 +152,32 @@ func DecodeTransaction(byteTransaction []byte) *Transaction {
 	return &transaction
 }
 
-func (unspentOutputs *UnspentOutput) CreateInputs(privateKey []byte) []*Input {
+func (unspentOutput *UnspentOutput) CreateInputs(privateKey []byte) []*Input {
 	var inputs []*Input
 
-	for _, output := range unspentOutputs.Outputs {
+	for _, output := range unspentOutput.Outputs {
 		inputs = append(inputs, &Input{output, Sign(output.Amount, privateKey), GetPublicKeyFromPrivateKey(privateKey)})
 	}
 
 	return inputs
 }
 
-func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output, int) {
+func (unspentOutput *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output, int) {
 	var outputs []*Output
 
-	if len(unspentOutputs.Outputs) == 0 {
+	if len(unspentOutput.Outputs) == 0 {
 		log.Panic("No unspent outputs to choose from")
 	}
 
-	sort.Slice(unspentOutputs.Outputs, func(i, j int) bool {
-		return unspentOutputs.Outputs[i].Amount > unspentOutputs.Outputs[j].Amount
+	sort.Slice(unspentOutput.Outputs, func(i, j int) bool {
+		return unspentOutput.Outputs[i].Amount > unspentOutput.Outputs[j].Amount
 	})
 
-	rest := unspentOutputs.Outputs
+	rest := unspentOutput.Outputs
 
-	if amount > unspentOutputs.Outputs[0].Amount {
+	if amount > unspentOutput.Outputs[0].Amount {
 		index := -1
-		for i, output := range unspentOutputs.Outputs {
+		for i, output := range unspentOutput.Outputs {
 			if amount > 0 {
 				outputs = append(outputs, output)
 				amount -= output.Amount
@@ -191,9 +191,9 @@ func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output,
 		}
 		rest = rest[index:]
 	} else {
-		for i, output := range unspentOutputs.Outputs {
-			if amount < output.Amount && i < len(unspentOutputs.Outputs)-1 {
-				if amount > unspentOutputs.Outputs[i+1].Amount {
+		for i, output := range unspentOutput.Outputs {
+			if amount < output.Amount && i < len(unspentOutput.Outputs)-1 {
+				if amount > unspentOutput.Outputs[i+1].Amount {
 					outputs = append(outputs, output)
 					amount -= output.Amount
 					rest = append(rest[:i], rest[i+1:]...)
@@ -208,11 +208,11 @@ func (unspentOutputs *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output,
 		}
 	}
 
-	if len(rest) == len(unspentOutputs.Outputs) {
+	if len(rest) == len(unspentOutput.Outputs) {
 		return nil, amount
 	}
 
-	unspentOutputs.Outputs = outputs
+	unspentOutput.Outputs = outputs
 
 	return rest, amount
 }

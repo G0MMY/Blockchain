@@ -96,25 +96,25 @@ func InitBlockchain(privateKey []byte) *Blockchain {
 func (blockchain *Blockchain) GetBlockchain() []*Block {
 	blockchainIterator := &BlockchainIterator{blockchain.LastHash, blockchain.DB}
 
-	return blockchainIterator.GetBlockchain()
+	return blockchainIterator.getBlockchain()
 }
 
-func (iter *BlockchainIterator) GetBlockchain() []*Block {
+func (iter *BlockchainIterator) getBlockchain() []*Block {
 	var blockchain []*Block
 
-	currentBlock := iter.Next()
+	currentBlock := iter.next()
 	if currentBlock != nil {
 		blockchain = append(blockchain, currentBlock)
 
 		for bytes.Compare(iter.CurrentHash, []byte{}) != 0 {
-			blockchain = append(blockchain, iter.Next())
+			blockchain = append(blockchain, iter.next())
 		}
 	}
 
 	return blockchain
 }
 
-func (iter *BlockchainIterator) Next() *Block {
+func (iter *BlockchainIterator) next() *Block {
 	var read *opt.ReadOptions
 
 	if byteBlock, err := iter.DB.Get(iter.CurrentHash, read); err != nil {
@@ -161,7 +161,6 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	return nil
 }
 
-//add merkle root
 func (blockchain *Blockchain) CreateBlock(privateKey []byte) *Block {
 	if !IsValidPrivateKey(privateKey) {
 		log.Panic("Invalid private key")
@@ -172,7 +171,7 @@ func (blockchain *Blockchain) CreateBlock(privateKey []byte) *Block {
 	blockchain.updateMemPoolTransactions(transactionsHash)
 
 	if lastBlock != nil {
-		block := CreateBlock(privateKey, lastBlock.Index+1, blockchain.LastHash, transactions, &Tree{})
+		block := CreateBlock(privateKey, lastBlock.Index+1, blockchain.LastHash, transactions)
 
 		blockchain.addBlock(block)
 		return block
@@ -184,7 +183,7 @@ func (blockchain *Blockchain) addBlock(block *Block) {
 	var write *opt.WriteOptions
 	hash := block.Hash()
 
-	blockchain.PersistUnspentOutputs(block)
+	blockchain.persistUnspentOutputs(block)
 
 	if err := blockchain.DB.Put([]byte("lastHash"), hash, write); err != nil {
 		log.Panic(err)
@@ -197,7 +196,7 @@ func (blockchain *Blockchain) addBlock(block *Block) {
 	blockchain.LastHash = hash
 }
 
-func (blockchain *Blockchain) PersistUnspentOutputs(block *Block) {
+func (blockchain *Blockchain) persistUnspentOutputs(block *Block) {
 	var publicKeys []string
 	outputsPerPubKey := make(map[string][]*Output)
 
@@ -277,35 +276,6 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 	iter.Release()
 
 	return transactions
-}
-
-func (blockchain *Blockchain) GetAllUnspentOutputsKeys() [][]byte {
-	var read *opt.ReadOptions
-	var transactions [][]byte
-
-	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("UnspentOutput-")), read)
-
-	for iter.Next() {
-		byteTransaction := iter.Key()
-		transactions = append(transactions, byteTransaction)
-	}
-	iter.Release()
-
-	return transactions
-}
-func (blockchain *Blockchain) GetAllUnspentOutputs() *UnspentOutput {
-	var read *opt.ReadOptions
-	var transactions UnspentOutput
-
-	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("UnspentOutput-")), read)
-
-	for iter.Next() {
-		byteTransaction := iter.Value()
-		transactions.Outputs = append(transactions.Outputs, DecodeUnspentOutput(byteTransaction).Outputs...)
-	}
-	iter.Release()
-
-	return &transactions
 }
 
 func (blockchain *Blockchain) CreateTransaction(privateKey, to []byte, amount, fee int, timestamp int64) *Transaction {

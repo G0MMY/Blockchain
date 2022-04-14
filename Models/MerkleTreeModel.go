@@ -1,6 +1,7 @@
 package Models
 
 import (
+	"bytes"
 	"crypto/sha256"
 )
 
@@ -15,6 +16,63 @@ type Node struct {
 }
 
 func CreateTree(transactions []*Transaction) *Tree {
+	if transactions == nil || len(transactions) == 0 {
+		return nil
+	}
+	treeArray := createTreeArray(transactions)
+	treeNode := linkNodes(len(treeArray)-1, 0, treeArray)
+
+	return &Tree{treeNode}
+}
+
+func (tree *Tree) CheckTree(transactions []*Transaction) bool {
+	if len(transactions)%2 != 0 {
+		transactions = append(transactions, transactions[len(transactions)-1])
+	}
+
+	var hash [][]byte
+	for _, transaction := range transactions {
+		hash = append(hash, transaction.Hash())
+	}
+
+	return browseTree(tree.RootNode, hash, 0)
+}
+
+func browseTree(node *Node, hash [][]byte, j int) bool {
+	if j >= len(hash) {
+		j -= 2
+	}
+	if node.LeftNode.Data == nil && node.RightNode.Data == nil {
+		if bytes.Compare(node.Data, hash[j]) != 0 {
+			return false
+		}
+		return true
+	}
+	if !browseTree(node.LeftNode, hash, j*2) {
+		return false
+	}
+	if !browseTree(node.RightNode, hash, j*2+1) {
+		return false
+	}
+
+	return true
+}
+
+func linkNodes(i, j int, treeArray [][][]byte) *Node {
+	node := &Node{}
+	if i >= 0 {
+		if j >= len(treeArray[i]) {
+			j -= 2
+		}
+		node.Data = treeArray[i][j]
+		node.LeftNode = linkNodes(i-1, j*2, treeArray)
+		node.RightNode = linkNodes(i-1, j*2+1, treeArray)
+	}
+
+	return node
+}
+
+func createTreeArray(transactions []*Transaction) [][][]byte {
 	if len(transactions)%2 != 0 {
 		transactions = append(transactions, transactions[len(transactions)-1])
 	}
@@ -45,7 +103,7 @@ func CreateTree(transactions []*Transaction) *Tree {
 		treeArray = append(treeArray, row)
 	}
 
-	return &Tree{}
+	return treeArray
 }
 
 func appendHash(first, second []byte) []byte {
