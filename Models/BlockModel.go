@@ -151,3 +151,11 @@ func (block *Block) EncodeBlock() []byte {
 
 	return buffer.Bytes()
 }
+
+func (block *Block) CheckMerkleRoot(merkleRoot []byte) bool {
+	if bytes.Compare(block.MerkleRoot, merkleRoot) == 0 {
+		return true
+	}
+
+	return false
+}

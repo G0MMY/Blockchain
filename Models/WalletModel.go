@@ -204,3 +204,19 @@ func ValidateSignature(amount int, publicKey, signature []byte) bool {
 
 	return ecdsa.VerifyASN1(DecodePublicKey(publicKey), HashInt(amount), signature)
 }
+
+func GetBalance(address []byte, unspentOutputs *UnspentOutput) int {
+	balance := 0
+
+	if unspentOutputs != nil && unspentOutputs.Outputs != nil {
+		pubKeyHash := ValidateAddress(address)
+
+		for _, output := range unspentOutputs.Outputs {
+			if bytes.Compare(pubKeyHash, output.PublicKeyHash) == 0 {
+				balance += output.Amount
+			}
+		}
+	}
+
+	return balance
+}

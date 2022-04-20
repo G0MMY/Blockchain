@@ -2,6 +2,7 @@ package Models
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -146,6 +147,18 @@ func (blockchain *Blockchain) GetLastBlock() *Block {
 	return nil
 }
 
+func (blockchain *Blockchain) HashMemPoolTransactions() []byte {
+	var hashTransactions [][]byte
+
+	for _, transaction := range blockchain.GetMemPoolTransactions() {
+		hashTransactions = append(hashTransactions, transaction.Hash())
+	}
+
+	hash := sha256.Sum256(bytes.Join(hashTransactions, []byte{}))
+
+	return hash[:]
+}
+
 func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	var read *opt.ReadOptions
 
@@ -159,6 +172,10 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 	}
 
 	return nil
+}
+
+func (blockchain *Blockchain) GetMerkleRoot(blockHash []byte) []byte {
+	return blockchain.GetBlock(blockHash).MerkleRoot
 }
 
 func (blockchain *Blockchain) CreateBlock(privateKey []byte) *Block {
@@ -315,4 +332,10 @@ func (blockchain *Blockchain) CreateTransaction(privateKey, to []byte, amount, f
 	}
 
 	return transaction
+}
+
+func (blockchain *Blockchain) GetBalance(address []byte) int {
+	pubKeyHash := ValidateAddress(address)
+
+	return GetBalance(address, blockchain.GetUnspentOutputs(pubKeyHash))
 }
