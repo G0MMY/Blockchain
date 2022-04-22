@@ -1,6 +1,7 @@
 package Handlers
 
 import (
+	"blockchain/Models"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ func (handler *Handler) GetBlockMerkleRoot(w http.ResponseWriter, r *http.Reques
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+		return
 	}
 
 	vars := mux.Vars(r)
@@ -22,6 +24,7 @@ func (handler *Handler) GetBlockMerkleRoot(w http.ResponseWriter, r *http.Reques
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode("Error while trying to decode the block hash")
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
@@ -34,6 +37,7 @@ func (handler *Handler) GetBlockTransactions(w http.ResponseWriter, r *http.Requ
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+		return
 	}
 
 	vars := mux.Vars(r)
@@ -62,6 +66,7 @@ func (handler *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+		return
 	}
 
 	vars := mux.Vars(r)
@@ -71,9 +76,44 @@ func (handler *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode("Error while trying to decode the block hash")
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(handler.Blockchain.GetBlock(blockHash))
+}
+
+//test it
+func (handler *Handler) CreateBlock(w http.ResponseWriter, r *http.Request) {
+	var body Models.CreateBlockRequest
+	decoder := json.NewDecoder(r.Body)
+
+	if err := decoder.Decode(&body); err != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(err.Error())
+		return
+	}
+	defer r.Body.Close()
+
+	priv, err := hex.DecodeString(body.PrivateKey)
+	if err != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode("Error while trying to decode the private key")
+		return
+	}
+
+	block, errorMessage := handler.Blockchain.CreateBlock(priv, Models.CreateBlockToBlock(body))
+
+	if block == nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorMessage)
+	} else {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(block)
+	}
 }

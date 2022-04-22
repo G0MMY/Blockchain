@@ -178,22 +178,53 @@ func (blockchain *Blockchain) GetMerkleRoot(blockHash []byte) []byte {
 	return blockchain.GetBlock(blockHash).MerkleRoot
 }
 
-func (blockchain *Blockchain) CreateBlock(privateKey []byte) *Block {
+func (blockchain *Blockchain) CreateBlock(privateKey []byte, block *Block) (*Block, string) {
 	if !IsValidPrivateKey(privateKey) {
 		log.Panic("Invalid private key")
 	}
+
 	lastBlock := blockchain.GetLastBlock()
-	transactions, transactionsHash := FindBestMemPoolTransactions(blockchain.GetMemPoolTransactions(), NumberOfTransactions, privateKey)
-
-	blockchain.updateMemPoolTransactions(transactionsHash)
-
-	if lastBlock != nil {
-		block := CreateBlock(privateKey, lastBlock.Index+1, blockchain.LastHash, transactions)
-
-		blockchain.addBlock(block)
-		return block
+	if lastBlock.Index+1 != block.Index {
+		return nil, "Bad index"
+	} else if !block.ValidateProof() {
+		return nil, "Bad Proof"
+	} else if bytes.Compare(lastBlock.Hash(), block.PreviousHash) != 0 {
+		return nil, "Bad Previous Hash"
+	} else if !blockchain.TransactionsExists(block.Transactions) {
+		return nil, "Bad Transactions"
+	} else if !block.MerkleTree.CheckTree(block.Transactions) {
+		return nil, "Bad Tree"
+	} else if bytes.Compare(block.MerkleRoot, block.MerkleTree.RootNode.Data) != 0 {
+		return nil, "Bad Tree Root"
 	}
-	return nil
+
+	blockchain.updateMemPoolTransactions(HashTransactions(block.Transactions))
+	blockchain.addBlock(block)
+
+	return block, ""
+}
+
+func (blockchain *Blockchain) TransactionsExists(transactions []*Transaction) bool {
+	for _, transaction := range transactions {
+		if !blockchain.TransactionExist(transaction) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (blockchain *Blockchain) TransactionExist(transaction *Transaction) bool {
+	var read *opt.ReadOptions
+
+	if _, err := blockchain.DB.Get(GenerateMemPoolTransactionKey(transaction.Hash()), read); err != nil {
+		if err.Error() == "leveldb: not found" {
+			return false
+		}
+		log.Panic(err)
+	}
+
+	return true
 }
 
 func (blockchain *Blockchain) addBlock(block *Block) {
@@ -259,12 +290,7 @@ func (blockchain *Blockchain) updateMemPoolTransactions(memPoolTransactions [][]
 	var write *opt.WriteOptions
 
 	for _, hash := range memPoolTransactions {
-		key := bytes.Join([][]byte{
-			[]byte("MemPool-"),
-			hash,
-		}, []byte{})
-
-		if err := blockchain.DB.Delete(key, write); err != nil {
+		if err := blockchain.DB.Delete(GenerateMemPoolTransactionKey(hash), write); err != nil {
 			log.Panic(err)
 		}
 	}

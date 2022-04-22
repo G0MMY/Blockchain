@@ -14,6 +14,7 @@ func (handler *Handler) GetPublicKeyBalance(w http.ResponseWriter, r *http.Reque
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+		return
 	}
 
 	vars := mux.Vars(r)
@@ -23,6 +24,7 @@ func (handler *Handler) GetPublicKeyBalance(w http.ResponseWriter, r *http.Reque
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode("Error while trying to decode the address")
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")

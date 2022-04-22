@@ -31,6 +31,8 @@ func InitializeNode(privateKey []byte, port string) {
 	router.HandleFunc("/chain", handler.GetChain).Methods(http.MethodGet)
 
 	router.HandleFunc("/create/wallet", handler.CreateWallet).Methods(http.MethodGet)
+	router.HandleFunc("/create/transaction", handler.CreateTransaction).Methods(http.MethodPost)
+	router.HandleFunc("/create/block", handler.CreateBlock).Methods(http.MethodPost)
 
 	log.Println("running")
 	http.ListenAndServe(":"+port, router)

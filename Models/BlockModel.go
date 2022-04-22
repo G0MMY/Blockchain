@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"encoding/hex"
 	"log"
 	"math/big"
 	"time"
@@ -21,6 +22,35 @@ type Block struct {
 	PreviousHash []byte
 	Transactions []*Transaction
 	MerkleTree   *Tree
+}
+
+func CreateBlockToBlock(createBlock CreateBlockRequest) *Block {
+	var transactions []*Transaction
+
+	for _, stringHash := range createBlock.Transactions {
+		hash, err := hex.DecodeString(stringHash)
+		if err != nil {
+			return nil
+		}
+		transactions = append(transactions, DecodeTransaction(hash))
+	}
+
+	merkleRoot, err := hex.DecodeString(createBlock.MerkleRoot)
+	if err != nil {
+		return nil
+	}
+
+	previousHash, err := hex.DecodeString(createBlock.PreviousHash)
+	if err != nil {
+		return nil
+	}
+
+	tree, err := hex.DecodeString(createBlock.MerkleTree)
+	if err != nil {
+		return nil
+	}
+
+	return &Block{createBlock.Index, createBlock.Nonce, createBlock.Timestamp, merkleRoot, previousHash, transactions, DecodeTree(tree)}
 }
 
 func CreateGenesisBlock(privateKey []byte) *Block {

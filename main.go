@@ -1,8 +1,8 @@
 package main
 
 import (
-	"blockchain/Models"
 	"blockchain/Network"
+	"encoding/hex"
 )
 
 func main() {
@@ -23,5 +23,10 @@ func main() {
 	//}
 	//
 	//blockchain.DB.Close()
-	Network.InitializeNode(Models.CreateWallet().PrivateKey, "4000")
+	priv, _ := hex.DecodeString("307702010104207d8dc86cd1956e3a4a57aaa3681ccfd9422ca4420046f9ea89417e041372d5d0a00a06082a8648ce3d030107a14403420004b0fb2b18f23b976e47938c7b9b3c232838f43eb42e916445a754a897ee8c98c0b3eb73b39affc87f96dae1f92659f23a031d411f3b2bbef09bd2288f9dccd9c4")
+
+	Network.InitializeNode(priv, "4000")
 }
+
+//3059301306072a8648ce3d020106082a8648ce3d03010703420004b0fb2b18f23b976e47938c7b9b3c232838f43eb42e916445a754a897ee8c98c0b3eb73b39affc87f96dae1f92659f23a031d411f3b2bbef09bd2288f9dccd9c4
+//313274356b4251457445707257556f593648774d6270487876565233726d4c43746a

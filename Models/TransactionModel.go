@@ -90,6 +90,16 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 	return memPoolTransactions, transactionsHash
 }
 
+func HashTransactions(transactions []*Transaction) [][]byte {
+	var hashTransactions [][]byte
+
+	for _, transaction := range transactions {
+		hashTransactions = append(hashTransactions, transaction.Hash())
+	}
+
+	return hashTransactions
+}
+
 func (transaction *Transaction) addFeeOutput(privateKey []byte) {
 	if !IsValidPrivateKey(privateKey) {
 		log.Panic("Invalid private key")
@@ -232,6 +242,13 @@ func GenerateUnspentOutputKey(address []byte) []byte {
 	return bytes.Join([][]byte{
 		[]byte("UnspentOutput-"),
 		address,
+	}, []byte{})
+}
+
+func GenerateMemPoolTransactionKey(hash []byte) []byte {
+	return bytes.Join([][]byte{
+		[]byte("MemPool-"),
+		hash,
 	}, []byte{})
 }
 
