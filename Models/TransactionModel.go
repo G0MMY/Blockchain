@@ -38,6 +38,7 @@ type UnspentOutput struct {
 	Outputs []*Output
 }
 
+//maybe check that not sure if its good
 func CreateCoinbase(privateKey []byte) *Transaction {
 	input := &Input{&Output{Amount: coinbaseAmount}, Sign(coinbaseAmount, privateKey), GetPublicKeyFromPrivateKey(privateKey)}
 	output := &Output{[]byte{}, -1, 0, ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), coinbaseAmount}
@@ -90,14 +91,32 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 	return memPoolTransactions, transactionsHash
 }
 
-func HashTransactions(transactions []*Transaction) [][]byte {
+func HashTransactions(block *Block) [][]byte {
 	var hashTransactions [][]byte
 
-	for _, transaction := range transactions {
-		hashTransactions = append(hashTransactions, transaction.Hash())
+	for _, transaction := range block.Transactions {
+		hashTransactions = append(hashTransactions, transaction.GetMemPoolHash(block))
 	}
 
 	return hashTransactions
+}
+
+func (transaction *Transaction) GetMemPoolHash(block *Block) []byte {
+	temp := *transaction
+	var tempOutputs []*Output
+	for _, output := range temp.Outputs {
+		if output.Amount == temp.Fee && bytes.Compare(output.PublicKeyHash, block.Transactions[len(block.Transactions)-1].Outputs[0].PublicKeyHash) == 0 {
+		} else {
+			tempOutput := *output
+			tempOutput.Index = -1
+			tempOutput.TransactionIndex = -1
+			tempOutput.BlockId = nil
+			tempOutputs = append(tempOutputs, &tempOutput)
+		}
+	}
+	temp.Outputs = tempOutputs
+
+	return temp.Hash()
 }
 
 func (transaction *Transaction) addFeeOutput(privateKey []byte) {

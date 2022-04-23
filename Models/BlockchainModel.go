@@ -190,7 +190,9 @@ func (blockchain *Blockchain) CreateBlock(privateKey []byte, block *Block) (*Blo
 		return nil, "Bad Proof"
 	} else if bytes.Compare(lastBlock.Hash(), block.PreviousHash) != 0 {
 		return nil, "Bad Previous Hash"
-	} else if !blockchain.TransactionsExists(block.Transactions) {
+	} else if !block.Transactions[len(block.Transactions)-1].IsCoinbase() {
+		return nil, "The coinbase needs to be the last transaction of the block"
+	} else if len(block.Transactions) > 0 && !blockchain.TransactionsExists(block.Transactions, block) {
 		return nil, "Bad Transactions"
 	} else if !block.MerkleTree.CheckTree(block.Transactions) {
 		return nil, "Bad Tree"
@@ -198,15 +200,15 @@ func (blockchain *Blockchain) CreateBlock(privateKey []byte, block *Block) (*Blo
 		return nil, "Bad Tree Root"
 	}
 
-	blockchain.updateMemPoolTransactions(HashTransactions(block.Transactions))
+	blockchain.updateMemPoolTransactions(HashTransactions(block))
 	blockchain.addBlock(block)
 
 	return block, ""
 }
 
-func (blockchain *Blockchain) TransactionsExists(transactions []*Transaction) bool {
+func (blockchain *Blockchain) TransactionsExists(transactions []*Transaction, block *Block) bool {
 	for _, transaction := range transactions {
-		if !blockchain.TransactionExist(transaction) {
+		if !transaction.IsCoinbase() && !blockchain.TransactionExist(transaction, block) {
 			return false
 		}
 	}
@@ -214,10 +216,10 @@ func (blockchain *Blockchain) TransactionsExists(transactions []*Transaction) bo
 	return true
 }
 
-func (blockchain *Blockchain) TransactionExist(transaction *Transaction) bool {
+func (blockchain *Blockchain) TransactionExist(transaction *Transaction, block *Block) bool {
 	var read *opt.ReadOptions
 
-	if _, err := blockchain.DB.Get(GenerateMemPoolTransactionKey(transaction.Hash()), read); err != nil {
+	if _, err := blockchain.DB.Get(GenerateMemPoolTransactionKey(transaction.GetMemPoolHash(block)), read); err != nil {
 		if err.Error() == "leveldb: not found" {
 			return false
 		}
@@ -273,9 +275,7 @@ func (blockchain *Blockchain) persistUnspentOutputs(block *Block) {
 func (blockchain *Blockchain) GetUnspentOutputs(address []byte) *UnspentOutput {
 	var read *opt.ReadOptions
 
-	key := GenerateUnspentOutputKey(address)
-
-	if outputs, err := blockchain.DB.Get(key, read); err != nil {
+	if outputs, err := blockchain.DB.Get(GenerateUnspentOutputKey(address), read); err != nil {
 		if err.Error() != "leveldb: not found" {
 			log.Panic()
 		}
@@ -348,10 +348,7 @@ func (blockchain *Blockchain) CreateTransaction(privateKey, to []byte, amount, f
 	blockchain.updateUnspentOutputs(&UnspentOutput{outputRest}, fromHash)
 
 	transaction := CreateTransaction(toHash, fromHash, privateKey, amount, amountRest, fee, timestamp, unspentOutputs)
-	key := bytes.Join([][]byte{
-		[]byte("MemPool-"),
-		transaction.Hash(),
-	}, []byte{})
+	key := GenerateMemPoolTransactionKey(transaction.Hash())
 
 	if err := blockchain.DB.Put(key, transaction.EncodeTransaction(), write); err != nil {
 		log.Panic(err)

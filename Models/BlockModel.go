@@ -68,6 +68,7 @@ func CreateGenesisBlock(privateKey []byte) *Block {
 }
 
 func CreateBlock(privateKey []byte, index int, lastHash []byte, transactions []*Transaction) *Block {
+	transactions, _ = FindBestMemPoolTransactions(transactions, NumberOfTransactions, privateKey)
 	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{index, 0, time.Now().Unix(), nil, lastHash, append(transactions, coinbase), nil}
