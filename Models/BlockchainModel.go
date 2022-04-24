@@ -60,12 +60,13 @@ func InitTestBlockchain(privateKey []byte) *Blockchain {
 	return blockchain
 }
 
-func InitBlockchain(privateKey []byte) *Blockchain {
-	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
-	}
+func InitBlockchain(port string) *Blockchain {
+	//privateKey := CreateWallet().PrivateKey
+	//if !IsValidPrivateKey(privateKey) {
+	//	log.Panic("Invalid private key")
+	//}
 	var read *opt.ReadOptions
-	db, err := leveldb.OpenFile("./db", nil)
+	db, err := leveldb.OpenFile("./db"+port, nil)
 
 	if err != nil {
 		log.Panic(err)
@@ -86,12 +87,12 @@ func InitBlockchain(privateKey []byte) *Blockchain {
 
 		return &Blockchain{lastHash, db}
 	}
+	//
+	//block := CreateGenesisBlock(privateKey)
+	//blockchain := &Blockchain{[]byte{}, db}
+	//blockchain.addBlock(block)
 
-	block := CreateGenesisBlock(privateKey)
-	blockchain := &Blockchain{[]byte{}, db}
-	blockchain.addBlock(block)
-
-	return blockchain
+	return nil
 }
 
 func (blockchain *Blockchain) GetBlockchain() []*Block {
