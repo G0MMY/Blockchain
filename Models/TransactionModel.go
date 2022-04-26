@@ -27,11 +27,8 @@ type Input struct {
 }
 
 type Output struct {
-	BlockId          []byte
-	TransactionIndex int
-	Index            int
-	PublicKeyHash    []byte
-	Amount           int
+	PublicKeyHash []byte
+	Amount        int
 }
 
 type UnspentOutput struct {
@@ -41,7 +38,7 @@ type UnspentOutput struct {
 //maybe check that not sure if its good
 func CreateCoinbase(privateKey []byte) *Transaction {
 	input := &Input{&Output{Amount: coinbaseAmount}, Sign(coinbaseAmount, privateKey), GetPublicKeyFromPrivateKey(privateKey)}
-	output := &Output{[]byte{}, -1, 0, ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), coinbaseAmount}
+	output := &Output{ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), coinbaseAmount}
 
 	return &Transaction{[]*Input{input}, []*Output{output}, time.Now().Unix(), 0}
 }
@@ -51,10 +48,10 @@ func CreateTransaction(to, from, privateKey []byte, amount, amountRest, fee int,
 	inputs := unspentOutputs.CreateInputs(privateKey)
 
 	if amountRest < 0 {
-		outputs = append(outputs, &Output{[]byte{}, -1, -1, to, amount})
-		outputs = append(outputs, &Output{[]byte{}, -1, -1, from, amountRest * -1})
+		outputs = append(outputs, &Output{to, amount})
+		outputs = append(outputs, &Output{from, amountRest * -1})
 	} else if amountRest == 0 {
-		outputs = append(outputs, &Output{[]byte{}, -1, -1, to, amount})
+		outputs = append(outputs, &Output{to, amount})
 	}
 
 	return &Transaction{inputs, outputs, timestamp, fee}
@@ -91,14 +88,27 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 	return memPoolTransactions, transactionsHash
 }
 
-func HashTransactions(block *Block) [][]byte {
-	var hashTransactions [][]byte
-
-	for _, transaction := range block.Transactions {
-		hashTransactions = append(hashTransactions, transaction.GetMemPoolHash(block))
+func HashUnspentOutputs(unspentOutputs map[string]*UnspentOutput) []byte {
+	var byteUnspentOutputs [][]byte
+	for _, unspentOutput := range unspentOutputs {
+		byteUnspentOutputs = append(byteUnspentOutputs, unspentOutput.Hash())
 	}
 
-	return hashTransactions
+	hash := sha256.Sum256(bytes.Join(byteUnspentOutputs, []byte{}))
+
+	return hash[:]
+}
+
+func HashTransactions(transactions []*Transaction) []byte {
+	var byteTransactions [][]byte
+
+	for _, transaction := range transactions {
+		byteTransactions = append(byteTransactions, transaction.Hash())
+	}
+
+	hash := sha256.Sum256(bytes.Join(byteTransactions, []byte{}))
+
+	return hash[:]
 }
 
 func (transaction *Transaction) GetMemPoolHash(block *Block) []byte {
@@ -108,9 +118,6 @@ func (transaction *Transaction) GetMemPoolHash(block *Block) []byte {
 		if output.Amount == temp.Fee && bytes.Compare(output.PublicKeyHash, block.Transactions[len(block.Transactions)-1].Outputs[0].PublicKeyHash) == 0 {
 		} else {
 			tempOutput := *output
-			tempOutput.Index = -1
-			tempOutput.TransactionIndex = -1
-			tempOutput.BlockId = nil
 			tempOutputs = append(tempOutputs, &tempOutput)
 		}
 	}
@@ -123,7 +130,7 @@ func (transaction *Transaction) addFeeOutput(privateKey []byte) {
 	if !IsValidPrivateKey(privateKey) {
 		log.Panic("Invalid private key")
 	}
-	transaction.Outputs = append(transaction.Outputs, &Output{[]byte{}, -1, -1, ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), transaction.Fee})
+	transaction.Outputs = append(transaction.Outputs, &Output{ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), transaction.Fee})
 }
 
 func (transaction *Transaction) ValidateTransaction() {
@@ -163,7 +170,7 @@ func (transaction *Transaction) EncodeTransaction() []byte {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
 
-	if err := encoder.Encode(transaction); err != nil {
+	if err := encoder.Encode(transaction.CreateTransactionRequest()); err != nil {
 		log.Panic(err)
 	}
 
@@ -171,14 +178,14 @@ func (transaction *Transaction) EncodeTransaction() []byte {
 }
 
 func DecodeTransaction(byteTransaction []byte) *Transaction {
-	var transaction Transaction
+	var transaction TransactionRequest
 	decoder := gob.NewDecoder(bytes.NewReader(byteTransaction))
 
 	if err := decoder.Decode(&transaction); err != nil {
 		log.Panic(err)
 	}
 
-	return &transaction
+	return transaction.CreateTransaction()
 }
 
 func (unspentOutput *UnspentOutput) CreateInputs(privateKey []byte) []*Input {
@@ -246,15 +253,32 @@ func (unspentOutput *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output, 
 	return rest, amount
 }
 
+func (unspentOutput *UnspentOutput) Hash() []byte {
+	hash := sha256.Sum256(unspentOutput.EncodeUnspentOutput())
+
+	return hash[:]
+}
+
 func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
 
-	if err := encoder.Encode(unspentOutput); err != nil {
+	if err := encoder.Encode(unspentOutput.CreateUnspentOutputRequest()); err != nil {
 		log.Panic(err)
 	}
 
 	return buffer.Bytes()
+}
+
+func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
+	var unspentOutput UnspentOutputsRequest
+	decoder := gob.NewDecoder(bytes.NewReader(byteOutput))
+
+	if err := decoder.Decode(&unspentOutput); err != nil {
+		log.Panic(err)
+	}
+
+	return unspentOutput.CreateUnspentOutput()
 }
 
 func GenerateUnspentOutputKey(address []byte) []byte {
@@ -269,15 +293,4 @@ func GenerateMemPoolTransactionKey(hash []byte) []byte {
 		[]byte("MemPool-"),
 		hash,
 	}, []byte{})
-}
-
-func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
-	var output UnspentOutput
-	decoder := gob.NewDecoder(bytes.NewReader(byteOutput))
-
-	if err := decoder.Decode(&output); err != nil {
-		log.Panic(err)
-	}
-
-	return &output
 }

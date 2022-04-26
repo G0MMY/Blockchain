@@ -16,7 +16,7 @@ func (handler *Handler) GetMemPoolTransactionsHash(w http.ResponseWriter, r *htt
 	} else {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(fmt.Sprintf("%x", handler.Blockchain.HashMemPoolTransactions()))
+		json.NewEncoder(w).Encode(fmt.Sprintf("%x", handler.Blockchain.GetMemPoolTransactionsHash()))
 	}
 }
 
@@ -70,5 +70,29 @@ func (handler *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(transaction)
+	}
+}
+
+func (handler *Handler) GetAllUnspentOutputs(w http.ResponseWriter, r *http.Request) {
+	if handler.Blockchain.DB == nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+	} else {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(handler.Blockchain.GetAllUnspentOutputs())
+	}
+}
+
+func (handler *Handler) GetAllUnspentOutputsHash(w http.ResponseWriter, r *http.Request) {
+	if handler.Blockchain.DB == nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+	} else {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(fmt.Sprintf("%x", handler.Blockchain.GetAllUnspentOutputsHash()))
 	}
 }

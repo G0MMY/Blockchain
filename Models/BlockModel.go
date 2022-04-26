@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
-	"encoding/hex"
 	"log"
 	"math/big"
 	"time"
@@ -24,35 +23,6 @@ type Block struct {
 	MerkleTree   *Tree
 }
 
-func CreateBlockToBlock(createBlock CreateBlockRequest) *Block {
-	var transactions []*Transaction
-
-	for _, stringHash := range createBlock.Transactions {
-		hash, err := hex.DecodeString(stringHash)
-		if err != nil {
-			return nil
-		}
-		transactions = append(transactions, DecodeTransaction(hash))
-	}
-
-	merkleRoot, err := hex.DecodeString(createBlock.MerkleRoot)
-	if err != nil {
-		return nil
-	}
-
-	previousHash, err := hex.DecodeString(createBlock.PreviousHash)
-	if err != nil {
-		return nil
-	}
-
-	tree, err := hex.DecodeString(createBlock.MerkleTree)
-	if err != nil {
-		return nil
-	}
-
-	return &Block{createBlock.Index, createBlock.Nonce, createBlock.Timestamp, merkleRoot, previousHash, transactions, DecodeTree(tree)}
-}
-
 func CreateGenesisBlock(privateKey []byte) *Block {
 	if !IsValidPrivateKey(privateKey) {
 		log.Panic("Invalid private key")
@@ -60,7 +30,6 @@ func CreateGenesisBlock(privateKey []byte) *Block {
 	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{0, 0, time.Now().Unix(), nil, []byte{}, []*Transaction{coinbase}, nil}
-	block.linkCoinbase()
 	block.addTree()
 	block.Proof()
 
@@ -72,8 +41,6 @@ func CreateBlock(privateKey []byte, index int, lastHash []byte, transactions []*
 	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{index, 0, time.Now().Unix(), nil, lastHash, append(transactions, coinbase), nil}
-	block.linkCoinbase()
-	block.linkOutputs()
 	block.addTree()
 	block.Proof()
 
@@ -106,25 +73,6 @@ func (block *Block) addTree() {
 
 	block.MerkleTree = tree
 	block.MerkleRoot = tree.RootNode.Data
-}
-
-func (block *Block) linkOutputs() {
-	for i, transaction := range block.Transactions {
-		for j, output := range transaction.Outputs {
-			output.Index = j
-			output.TransactionIndex = i
-			output.BlockId = block.Hash()
-		}
-	}
-}
-
-func (block *Block) linkCoinbase() {
-	for i, transaction := range block.Transactions {
-		if transaction.IsCoinbase() {
-			transaction.Outputs[0].TransactionIndex = i
-			transaction.Outputs[0].BlockId = block.Hash()
-		}
-	}
 }
 
 func (block *Block) ValidateProof() bool {
@@ -161,22 +109,32 @@ func (block *Block) Hash() []byte {
 	return hash[:]
 }
 
+func (block *Block) HashTransactions() [][]byte {
+	var hashTransactions [][]byte
+
+	for _, transaction := range block.Transactions {
+		hashTransactions = append(hashTransactions, transaction.GetMemPoolHash(block))
+	}
+
+	return hashTransactions
+}
+
 func DecodeBlock(byteBlock []byte) *Block {
-	var block Block
+	var block BlockRequest
 	decoder := gob.NewDecoder(bytes.NewReader(byteBlock))
 
 	if err := decoder.Decode(&block); err != nil {
 		log.Panic(err)
 	}
 
-	return &block
+	return block.CreateBlock()
 }
 
 func (block *Block) EncodeBlock() []byte {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
 
-	if err := encoder.Encode(block); err != nil {
+	if err := encoder.Encode(block.CreateBlockRequest()); err != nil {
 		log.Panic(err)
 	}
 

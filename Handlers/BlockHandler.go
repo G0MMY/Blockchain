@@ -81,12 +81,11 @@ func (handler *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(handler.Blockchain.GetBlock(blockHash))
+	json.NewEncoder(w).Encode(handler.Blockchain.GetBlock(blockHash).CreateBlockRequest())
 }
 
-//test it
 func (handler *Handler) CreateBlock(w http.ResponseWriter, r *http.Request) {
-	var body Models.CreateBlockRequest
+	var body Models.CreateBlockResponse
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(&body); err != nil {
@@ -105,7 +104,7 @@ func (handler *Handler) CreateBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	block, errorMessage := handler.Blockchain.CreateBlock(priv, Models.CreateBlockToBlock(body))
+	block, errorMessage := handler.Blockchain.CreateBlock(priv, Models.CreateBlockToBlock(&body))
 
 	if block == nil {
 		w.Header().Add("Content-Type", "application/json")
