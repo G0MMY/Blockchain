@@ -62,36 +62,6 @@ func (tree *Tree) CheckTree(transactions []*Transaction) bool {
 	return browseTree(tree.RootNode, hash, 0)
 }
 
-func (tree *Tree) test(transactions []TransactionRequest) bool {
-	if len(transactions)%2 != 0 {
-		transactions = append(transactions, transactions[len(transactions)-1])
-	}
-
-	var hash [][]byte
-	for _, transaction := range transactions {
-		hash = append(hash, transaction.Hash())
-	}
-
-	return browseTree(tree.RootNode, hash, 0)
-}
-
-func (transaction TransactionRequest) Hash() []byte {
-	hash := sha256.Sum256(transaction.EncodeTransaction())
-
-	return hash[:]
-}
-
-func (transaction TransactionRequest) EncodeTransaction() []byte {
-	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
-
-	if err := encoder.Encode(transaction); err != nil {
-		log.Panic(err)
-	}
-
-	return buffer.Bytes()
-}
-
 func browseTree(node *Node, hash [][]byte, j int) bool {
 	if j >= len(hash) {
 		j -= 2

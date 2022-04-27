@@ -2,7 +2,7 @@ package Models
 
 import (
 	"bytes"
-	"encoding/hex"
+	"github.com/ugorji/go/codec"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -44,19 +44,40 @@ type InputRequest struct {
 	PublicKey []byte
 }
 
-type CreateBlockResponse struct {
-	Index        int
-	Nonce        int
-	Timestamp    int64
-	MerkleRoot   string
-	PreviousHash string
-	Transactions []string
-	MerkleTree   string
-	PrivateKey   string
-}
-
 type UnspentOutputsRequest struct {
 	Outputs []Output
+}
+
+type OtherFullNode struct {
+	Address   string
+	Neighbors []string
+}
+
+type UpdateNetwork struct {
+	Received []string
+	Node     OtherFullNode
+}
+
+func (updateNetwork UpdateNetwork) Encode() []byte {
+	var buffer bytes.Buffer
+	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
+
+	if err := encoder.Encode(updateNetwork); err != nil {
+		log.Panic(err)
+	}
+
+	return buffer.Bytes()
+}
+
+func DecodeUpdateNeighbor(byteNeighbor []byte) UpdateNetwork {
+	var updateNetwork UpdateNetwork
+	decoder := codec.NewDecoder(bytes.NewReader(byteNeighbor), new(codec.JsonHandle))
+
+	if err := decoder.Decode(&updateNetwork); err != nil {
+		log.Panic(err)
+	}
+
+	return updateNetwork
 }
 
 func (request UnspentOutputsRequest) CreateUnspentOutput() *UnspentOutput {
@@ -135,33 +156,22 @@ func CreateTransactionsRequest(transactions []*Transaction) []TransactionRequest
 	return transactionsRequest
 }
 
-func CreateBlockToBlock(createBlock *CreateBlockResponse) *Block {
-	var transactions []*Transaction
+func ExecutePost(url string, responseBody *bytes.Buffer) []byte {
+	resp, err := http.Post(url, "application/json", responseBody)
 
-	for _, stringHash := range createBlock.Transactions {
-		hash, err := hex.DecodeString(stringHash)
-		if err != nil {
-			return nil
-		}
-		transactions = append(transactions, DecodeTransaction(hash))
-	}
-
-	merkleRoot, err := hex.DecodeString(createBlock.MerkleRoot)
 	if err != nil {
-		return nil
+		log.Panic(err)
 	}
+	defer resp.Body.Close()
 
-	previousHash, err := hex.DecodeString(createBlock.PreviousHash)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil
+		log.Fatalln(err)
+	} else if resp.Status != "200 OK" {
+		log.Panic(string(body))
 	}
 
-	tree, err := hex.DecodeString(createBlock.MerkleTree)
-	if err != nil {
-		return nil
-	}
-
-	return &Block{createBlock.Index, createBlock.Nonce, createBlock.Timestamp, merkleRoot, previousHash, transactions, DecodeTree(tree)}
+	return body
 }
 
 func ExecuteGet(url string) []byte {
@@ -173,7 +183,20 @@ func ExecuteGet(url string) []byte {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
+	} else if resp.Status != "200 OK" {
+		log.Panic(string(body))
 	}
 
 	return body
+}
+
+func ReadUserIP(r *http.Request) string {
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
+		IPAddress = r.RemoteAddr
+	}
+	return IPAddress
 }

@@ -36,7 +36,7 @@ func TestCreateBlock(t *testing.T) {
 	}
 	lastBlock := blockchain.GetLastBlock()
 	block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), blockchain.GetMemPoolTransactions())
-	block, err := blockchain.CreateBlock(wallet1.PrivateKey, block)
+	block, err := blockchain.CreateBlock(block)
 
 	if err != "" {
 		t.Error(err)
@@ -101,7 +101,7 @@ func TestTransactionsInBlock(t *testing.T) {
 
 	lastBlock := blockchain.GetLastBlock()
 	block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
-	block, err := blockchain.CreateBlock(wallet1.PrivateKey, block)
+	block, err := blockchain.CreateBlock(block)
 
 	if err != "" {
 		t.Error(err)
@@ -143,7 +143,7 @@ func TestMultipleTransactions(t *testing.T) {
 		lastBlock := blockchain.GetLastBlock()
 		memPool := blockchain.GetMemPoolTransactions()
 		block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
-		block, err := blockchain.CreateBlock(wallet1.PrivateKey, block)
+		block, err := blockchain.CreateBlock(block)
 
 		if err != "" {
 			t.Error(err)
@@ -159,7 +159,7 @@ func TestMultipleTransactions(t *testing.T) {
 	lastBlock := blockchain.GetLastBlock()
 	memPool := blockchain.GetMemPoolTransactions()
 	block1 := Models.CreateBlock(wallet2.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
-	block1, err := blockchain.CreateBlock(wallet2.PrivateKey, block1)
+	block1, err := blockchain.CreateBlock(block1)
 
 	if err != "" {
 		t.Error(err)
@@ -169,7 +169,7 @@ func TestMultipleTransactions(t *testing.T) {
 	lastBlock = blockchain.GetLastBlock()
 	memPool = blockchain.GetMemPoolTransactions()
 	block2 := Models.CreateBlock(wallet2.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
-	block2, err = blockchain.CreateBlock(wallet2.PrivateKey, block2)
+	block2, err = blockchain.CreateBlock(block2)
 
 	if err != "" {
 		t.Error(err)

@@ -3,7 +3,7 @@ package Models
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
+	"github.com/ugorji/go/codec"
 	"log"
 	"sort"
 	"time"
@@ -168,7 +168,7 @@ func (transaction *Transaction) IsCoinbase() bool {
 
 func (transaction *Transaction) EncodeTransaction() []byte {
 	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
+	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
 
 	if err := encoder.Encode(transaction.CreateTransactionRequest()); err != nil {
 		log.Panic(err)
@@ -179,7 +179,7 @@ func (transaction *Transaction) EncodeTransaction() []byte {
 
 func DecodeTransaction(byteTransaction []byte) *Transaction {
 	var transaction TransactionRequest
-	decoder := gob.NewDecoder(bytes.NewReader(byteTransaction))
+	decoder := codec.NewDecoder(bytes.NewReader(byteTransaction), new(codec.JsonHandle))
 
 	if err := decoder.Decode(&transaction); err != nil {
 		log.Panic(err)
@@ -261,7 +261,7 @@ func (unspentOutput *UnspentOutput) Hash() []byte {
 
 func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
 	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
+	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
 
 	if err := encoder.Encode(unspentOutput.CreateUnspentOutputRequest()); err != nil {
 		log.Panic(err)
@@ -272,7 +272,7 @@ func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
 
 func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
 	var unspentOutput UnspentOutputsRequest
-	decoder := gob.NewDecoder(bytes.NewReader(byteOutput))
+	decoder := codec.NewDecoder(bytes.NewReader(byteOutput), new(codec.JsonHandle))
 
 	if err := decoder.Decode(&unspentOutput); err != nil {
 		log.Panic(err)

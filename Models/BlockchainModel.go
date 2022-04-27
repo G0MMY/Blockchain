@@ -84,6 +84,10 @@ func InitBlockchain(port string) *Blockchain {
 		return &Blockchain{lastHash, db}
 	}
 
+	//block := CreateGenesisBlock(CreateWallet().PrivateKey)
+	//blockchain := &Blockchain{[]byte{}, db}
+	//blockchain.AddBlock(block)
+
 	return &Blockchain{nil, db}
 }
 
@@ -185,11 +189,7 @@ func (blockchain *Blockchain) GetMerkleRoot(blockHash []byte) []byte {
 	return blockchain.GetBlock(blockHash).MerkleRoot
 }
 
-func (blockchain *Blockchain) CreateBlock(privateKey []byte, block *Block) (*Block, string) {
-	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
-	}
-
+func (blockchain *Blockchain) CreateBlock(block *Block) (*Block, string) {
 	lastBlock := blockchain.GetLastBlock()
 	if lastBlock.Index+1 != block.Index {
 		return nil, "Bad index"

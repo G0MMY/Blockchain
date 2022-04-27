@@ -1,4 +1,4 @@
-package Handlers
+package Network
 
 import (
 	"blockchain/Models"
@@ -10,7 +10,7 @@ import (
 )
 
 func (handler *Handler) GetPublicKeyBalance(w http.ResponseWriter, r *http.Request) {
-	if handler.Blockchain.DB == nil {
+	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
@@ -29,7 +29,7 @@ func (handler *Handler) GetPublicKeyBalance(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(handler.Blockchain.GetBalance(address))
+	json.NewEncoder(w).Encode(handler.Node.Blockchain.GetBalance(address))
 }
 
 func (handler Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {

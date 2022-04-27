@@ -3,7 +3,7 @@ package Models
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
+	"github.com/ugorji/go/codec"
 	"log"
 	"math/big"
 	"time"
@@ -121,7 +121,7 @@ func (block *Block) HashTransactions() [][]byte {
 
 func DecodeBlock(byteBlock []byte) *Block {
 	var block BlockRequest
-	decoder := gob.NewDecoder(bytes.NewReader(byteBlock))
+	decoder := codec.NewDecoder(bytes.NewReader(byteBlock), new(codec.JsonHandle))
 
 	if err := decoder.Decode(&block); err != nil {
 		log.Panic(err)
@@ -132,7 +132,7 @@ func DecodeBlock(byteBlock []byte) *Block {
 
 func (block *Block) EncodeBlock() []byte {
 	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
+	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
 
 	if err := encoder.Encode(block.CreateBlockRequest()); err != nil {
 		log.Panic(err)
