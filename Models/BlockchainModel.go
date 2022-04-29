@@ -219,11 +219,13 @@ func (blockchain *Blockchain) GetMerkleRoot(blockHash []byte) []byte {
 
 func (blockchain *Blockchain) CreateBlock(block *Block) (*Block, string) {
 	lastBlock := blockchain.GetLastBlock()
+	if lastBlock == nil {
+		return nil, "nil last block"
+	}
+
 	hash := lastBlock.Hash()
 	if hash == nil {
 		return nil, "nil last block hash"
-	} else if lastBlock == nil {
-		return nil, "nil last block"
 	} else if lastBlock.Index+1 != block.Index {
 		return nil, "Bad index"
 	} else if !block.ValidateProof() {

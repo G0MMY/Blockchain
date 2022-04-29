@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-func (handler *Handler) GetMemPoolTransactionsHash(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetMemPoolTransactionsHash(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -19,7 +19,7 @@ func (handler *Handler) GetMemPoolTransactionsHash(w http.ResponseWriter, r *htt
 	}
 }
 
-func (handler *Handler) GetMemPoolTransactions(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetMemPoolTransactions(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -31,7 +31,7 @@ func (handler *Handler) GetMemPoolTransactions(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	var body Models.CreateTransactionRequest
 	decoder := json.NewDecoder(r.Body)
 
@@ -49,7 +49,7 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Added transaction")
 }
 
-func (handler *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	var body Models.TransactionRequest
 	decoder := json.NewDecoder(r.Body)
 
@@ -67,7 +67,7 @@ func (handler *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode("Created transaction")
 }
 
-func (handler *Handler) GetAllUnspentOutputs(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetAllUnspentOutputs(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -79,7 +79,7 @@ func (handler *Handler) GetAllUnspentOutputs(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (handler *Handler) GetAllUnspentOutputsHash(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetAllUnspentOutputsHash(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)

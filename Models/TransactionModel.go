@@ -73,7 +73,7 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 		for i < len(transactions) {
 			if transactions[i].Timestamp <= time.Now().Unix() {
 				if len(memPoolTransactions) < numberTransactions-1 {
-					if !transactions[i].addFeeOutput(privateKey) || !transactions[i].ValidateTransaction(true) {
+					if !transactions[i].addFeeOutput(privateKey) || !transactions[i].ValidateTransaction(false) {
 						return nil
 					}
 					memPoolTransactions = append(memPoolTransactions, transactions[i])
@@ -160,7 +160,7 @@ func (transaction *Transaction) ValidateTransaction(isMemPool bool) bool {
 		log.Println("Not all money is there")
 
 		return false
-	} else if isMemPool && inputAmount-outputAmount != transaction.Fee {
+	} else if isMemPool && inputAmount-outputAmount != transaction.Fee && !transaction.IsCoinbase() {
 		log.Println("The transaction output's are broken")
 
 		return false

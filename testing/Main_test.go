@@ -38,6 +38,7 @@ func TestCreateBlock(t *testing.T) {
 	block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), blockchain.GetMemPoolTransactions())
 	if block == nil {
 		t.Error("invalid tree")
+		return
 	}
 	block, err := blockchain.CreateBlock(block)
 
@@ -106,6 +107,7 @@ func TestTransactionsInBlock(t *testing.T) {
 	block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
 	if block == nil {
 		t.Error("invalid tree")
+		return
 	}
 	block, err := blockchain.CreateBlock(block)
 
@@ -151,6 +153,7 @@ func TestMultipleTransactions(t *testing.T) {
 		block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
 		if block == nil {
 			t.Error("invalid tree")
+			return
 		}
 		block, err := blockchain.CreateBlock(block)
 
@@ -170,6 +173,7 @@ func TestMultipleTransactions(t *testing.T) {
 	block1 := Models.CreateBlock(wallet2.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
 	if block1 == nil {
 		t.Error("invalid tree")
+		return
 	}
 	block1, err := blockchain.CreateBlock(block1)
 

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	difficulty = 14
+	Difficulty = 14
 )
 
 type Block struct {
@@ -42,9 +42,6 @@ func CreateGenesisBlock(privateKey []byte) *Block {
 
 func CreateBlock(privateKey []byte, index int, lastHash []byte, transactions []*Transaction) *Block {
 	transactions = FindBestMemPoolTransactions(transactions, NumberOfTransactions, privateKey)
-	if transactions == nil {
-		return nil
-	}
 	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{index, 0, time.Now().Unix(), nil, lastHash, append(transactions, coinbase), nil}
@@ -55,6 +52,19 @@ func CreateBlock(privateKey []byte, index int, lastHash []byte, transactions []*
 
 	block.proof()
 	if block.Nonce == -1 {
+		return nil
+	}
+
+	return block
+}
+
+func CreateBlockMiner(privateKey []byte, index int, lastHash []byte, transactions []*Transaction) *Block {
+	transactions = FindBestMemPoolTransactions(transactions, NumberOfTransactions, privateKey)
+	coinbase := CreateCoinbase(privateKey)
+
+	block := &Block{index, 0, time.Now().Unix(), nil, lastHash, append(transactions, coinbase), nil}
+	block.addTree()
+	if block.MerkleRoot == nil {
 		return nil
 	}
 
@@ -95,7 +105,7 @@ func (block *Block) addTree() {
 func (block *Block) ValidateProof() bool {
 	var intHash big.Int
 	target := big.NewInt(1)
-	target.Lsh(target, uint(256-difficulty))
+	target.Lsh(target, uint(256-Difficulty))
 
 	hash := block.Hash()
 	if hash == nil {
@@ -113,7 +123,7 @@ func (block *Block) ValidateProof() bool {
 func (block *Block) proof() {
 	var intHash big.Int
 	target := big.NewInt(1)
-	target.Lsh(target, uint(256-difficulty))
+	target.Lsh(target, uint(256-Difficulty))
 
 	for true {
 		block.Nonce += 1

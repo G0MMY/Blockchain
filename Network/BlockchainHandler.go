@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func (handler *Handler) GetLastHash(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetLastHash(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.LastHash == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -18,7 +18,7 @@ func (handler *Handler) GetLastHash(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (handler *Handler) GetChain(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetChain(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)

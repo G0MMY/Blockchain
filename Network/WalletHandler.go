@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-func (handler *Handler) GetPublicKeyBalance(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetPublicKeyBalance(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -32,7 +32,7 @@ func (handler *Handler) GetPublicKeyBalance(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(handler.Node.Blockchain.GetBalance(address))
 }
 
-func (handler Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) CreateWallet(w http.ResponseWriter, r *http.Request) {
 	wallet := Models.CreateWallet()
 
 	w.Header().Add("Content-Type", "application/json")

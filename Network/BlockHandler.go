@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-func (handler *Handler) GetBlockMerkleRoot(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetBlockMerkleRoot(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -32,7 +32,7 @@ func (handler *Handler) GetBlockMerkleRoot(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(fmt.Sprintf("%x", handler.Node.Blockchain.GetMerkleRoot(blockHash)))
 }
 
-func (handler *Handler) GetBlockTransactions(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetBlockTransactions(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -61,7 +61,7 @@ func (handler *Handler) GetBlockTransactions(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (handler *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetBlock(w http.ResponseWriter, r *http.Request) {
 	if handler.Node.Blockchain.DB == nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -84,7 +84,20 @@ func (handler *Handler) GetBlock(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(handler.Node.Blockchain.GetBlock(blockHash).CreateBlockRequest())
 }
 
-func (handler *Handler) CreateBlock(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) GetLastBlock(w http.ResponseWriter, r *http.Request) {
+	if handler.Node.Blockchain.DB == nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("The blockchain's DB is not initialized")
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(handler.Node.Blockchain.GetLastBlock().CreateBlockRequest())
+}
+
+func (handler *HandlerNode) CreateBlock(w http.ResponseWriter, r *http.Request) {
 	var body Models.BlockRequest
 	decoder := json.NewDecoder(r.Body)
 
@@ -102,7 +115,7 @@ func (handler *Handler) CreateBlock(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Created block")
 }
 
-func (handler *Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
+func (handler *HandlerNode) AddBlock(w http.ResponseWriter, r *http.Request) {
 	var body Models.BlockRequest
 	decoder := json.NewDecoder(r.Body)
 

@@ -19,18 +19,19 @@ var (
 	AddBlock          chan Models.BlockRequest
 	CreateTransaction chan Models.TransactionRequest
 	AddTransaction    chan Models.CreateTransactionRequest
+	AddMiner          chan string
 )
 
 type FullNode struct {
 	AllNodes   []string
 	Address    string
+	Miners     []string
 	Blockchain *Models.Blockchain
 }
 
 func InitializeNode(port string, allNodes []string) {
-	node := &FullNode{allNodes, port, nil}
+	node := &FullNode{allNodes, port, []string{}, nil}
 
-	//node.Blockchain = Models.InitTestBlockchain(Models.CreateWallet().PrivateKey)
 	node.Blockchain = Models.InitBlockchain(port)
 	if node.Blockchain == nil {
 		return
@@ -41,7 +42,7 @@ func InitializeNode(port string, allNodes []string) {
 	}
 	node.initializeAllNodes()
 
-	handler := New(node)
+	handler := NewNode(node)
 	router := mux.NewRouter()
 
 	router.HandleFunc("/lastHash", handler.GetLastHash).Methods(http.MethodGet)
@@ -52,6 +53,7 @@ func InitializeNode(port string, allNodes []string) {
 
 	router.HandleFunc("/memPoolTransactions", handler.GetMemPoolTransactions).Methods(http.MethodGet)
 	router.HandleFunc("/block/{blockHash}", handler.GetBlock).Methods(http.MethodGet)
+	router.HandleFunc("/lastBLock", handler.GetLastBlock).Methods(http.MethodGet)
 	router.HandleFunc("/transactions/{blockHash}", handler.GetBlockTransactions).Methods(http.MethodGet)
 	router.HandleFunc("/balance/{address}", handler.GetPublicKeyBalance).Methods(http.MethodGet)
 	router.HandleFunc("/chain", handler.GetChain).Methods(http.MethodGet)
@@ -64,21 +66,30 @@ func InitializeNode(port string, allNodes []string) {
 	router.HandleFunc("/add/node", handler.AddNode).Methods(http.MethodPost)
 	router.HandleFunc("/add/block", handler.AddBlock).Methods(http.MethodPost)
 	router.HandleFunc("/add/transaction", handler.AddTransaction).Methods(http.MethodPost)
+	router.HandleFunc("/add/miner", handler.AddMiner).Methods(http.MethodPost)
 
 	AddNode = make(chan string, 100)
 	CreateBlock = make(chan Models.BlockRequest, 100)
 	AddBlock = make(chan Models.BlockRequest, 100)
 	AddTransaction = make(chan Models.CreateTransactionRequest, 100)
 	CreateTransaction = make(chan Models.TransactionRequest, 100)
+	AddMiner = make(chan string, 100)
 
 	go addNodeWorker(AddNode, node)
 	go createBlockWorker(CreateBlock, node)
 	go addBLockWorker(AddBlock, node)
 	go addTransactionWorker(AddTransaction, node)
 	go createTransactionWorker(CreateTransaction, node)
+	go addMiner(AddMiner, node)
 
 	log.Println("running")
 	http.ListenAndServe(":"+port, router)
+}
+
+func addMiner(addMiner <-chan string, node *FullNode) {
+	for miner := range addMiner {
+		node.addMiner(miner)
+	}
 }
 
 func createBlockWorker(createBlock <-chan Models.BlockRequest, node *FullNode) {
@@ -109,6 +120,23 @@ func createTransactionWorker(createTransaction <-chan Models.TransactionRequest,
 	for transaction := range createTransaction {
 		node.createTransaction(transaction)
 	}
+}
+
+func (node *FullNode) addMiner(miner string) {
+	for _, address := range node.Miners {
+		if address == miner {
+			return
+		}
+	}
+
+	node.Miners = append(node.Miners, miner)
+	memPool := node.Blockchain.GetMemPoolTransactions()
+	lastBlock := node.Blockchain.GetLastBlock()
+	hash := lastBlock.Hash()
+	if hash == nil {
+		return
+	}
+	sendBlockToMiner(memPool, lastBlock, hash, miner)
 }
 
 func (node *FullNode) createTransaction(transactionRequest Models.TransactionRequest) {
@@ -150,12 +178,39 @@ func (node *FullNode) addTransaction(transactionRequest Models.CreateTransaction
 	}
 }
 
+func (node *FullNode) sendBlockToMiners() {
+	if len(node.Miners) == 0 {
+		return
+	}
+	memPool := node.Blockchain.GetMemPoolTransactions()
+	lastBlock := node.Blockchain.GetLastBlock()
+	hash := lastBlock.Hash()
+	if hash == nil {
+		return
+	}
+
+	for _, miner := range node.Miners {
+		sendBlockToMiner(memPool, lastBlock, hash, miner)
+	}
+}
+
+func sendBlockToMiner(memPool []*Models.Transaction, lastBlock *Models.Block, hash []byte, miner string) {
+	byteBody, err := json.Marshal(Models.MineBlockRequest{lastBlock.Index, hash, memPool})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	body := bytes.NewBuffer(byteBody)
+	Models.ExecutePost("http://localhost:"+miner+"/mine/block", body)
+}
+
 func (node *FullNode) createBlock(blockRequest Models.BlockRequest) {
 	block := blockRequest.CreateBlock()
 	if block == nil {
 		return
 	}
 	node.Blockchain.CreateBlock(block)
+	node.sendBlockToMiners()
 }
 
 func (node *FullNode) addBlock(blockRequest Models.BlockRequest) {
@@ -172,6 +227,7 @@ func (node *FullNode) addBlock(blockRequest Models.BlockRequest) {
 				go Models.ExecutePost("http://localhost:"+otherNode+"/create/block", body)
 			}
 		}
+		node.sendBlockToMiners()
 	} else {
 		log.Println(err)
 	}

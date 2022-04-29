@@ -47,6 +47,12 @@ type UnspentOutputsRequest struct {
 	Outputs []Output
 }
 
+type MineBlockRequest struct {
+	LastIndex           int
+	Hash                []byte
+	MemPoolTransactions []*Transaction
+}
+
 func (request UnspentOutputsRequest) CreateUnspentOutput() *UnspentOutput {
 	var outputs []*Output
 
