@@ -25,31 +25,37 @@ type BlockchainIterator struct {
 	DB          *leveldb.DB
 }
 
+//modify test to handle return nil
 func InitTestBlockchain(privateKey []byte) *Blockchain {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return nil
 	}
 	var read *opt.ReadOptions
 
 	db, err := leveldb.OpenFile("./testing/dbTest", nil)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	hasLastHash, err := db.Has([]byte("lastHash"), read)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	if hasLastHash {
 		err = os.RemoveAll("./testing/dbTest")
 		if err != nil {
-			log.Panic(err)
+			log.Println(err)
+			return nil
 		}
 
 		db, err = leveldb.OpenFile("./testing/dbTest", nil)
 		if err != nil {
-			log.Panic(err)
+			log.Println(err)
+			return nil
 		}
 	}
 
@@ -65,35 +71,38 @@ func InitBlockchain(port string) *Blockchain {
 	db, err := leveldb.OpenFile("./db"+port, nil)
 
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	hasLastHash, err := db.Has([]byte("lastHash"), read)
 
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	if hasLastHash {
 		lastHash, err := db.Get([]byte("lastHash"), read)
 
 		if err != nil {
-			log.Panic(err)
+			log.Println(err)
+			return nil
 		}
 
 		return &Blockchain{lastHash, db}
 	}
-
-	//block := CreateGenesisBlock(CreateWallet().PrivateKey)
+	//g, _ := hex.DecodeString("30770201010420087f1ddcfe6274bf1f49462e81a93c4e96dff5abffa6c266cd03284876d4ba49a00a06082a8648ce3d030107a14403420004f16f847f0c204bc36a6a3184f9b11f4b508999f52db0732120d20a97b27146d25c63162cd3ed22e4454989ed5a2752fc51c31f9865b9f43cec7dac3768f987eb")
+	//block := CreateGenesisBlock(g)
 	//blockchain := &Blockchain{[]byte{}, db}
 	//blockchain.AddBlock(block)
 
 	return &Blockchain{nil, db}
 }
 
-func (blockchain *Blockchain) ValidateBlockchain() {
+func (blockchain *Blockchain) ValidateBlockchain() bool {
 	blockchainIterator := &BlockchainIterator{blockchain.LastHash, blockchain.DB}
-	blockchainIterator.validateBlockchain()
+	return blockchainIterator.validateBlockchain()
 }
 
 func (blockchain *Blockchain) GetBlockchain() []*Block {
@@ -102,13 +111,19 @@ func (blockchain *Blockchain) GetBlockchain() []*Block {
 	return blockchainIterator.getBlockchain()
 }
 
-func (iter *BlockchainIterator) validateBlockchain() {
+func (iter *BlockchainIterator) validateBlockchain() bool {
 	currentBlock := iter.next()
 	if currentBlock != nil {
 		for bytes.Compare(iter.CurrentHash, []byte{}) != 0 {
-			iter.next()
+			if iter.next() == nil {
+				return false
+			}
 		}
+
+		return true
 	}
+
+	return false
 }
 
 func (iter *BlockchainIterator) getBlockchain() []*Block {
@@ -119,7 +134,11 @@ func (iter *BlockchainIterator) getBlockchain() []*Block {
 		blockchain = append(blockchain, currentBlock)
 
 		for bytes.Compare(iter.CurrentHash, []byte{}) != 0 {
-			blockchain = append(blockchain, iter.next())
+			block := iter.next()
+			if block == nil {
+				return nil
+			}
+			blockchain = append(blockchain, block)
 		}
 	}
 
@@ -130,12 +149,17 @@ func (iter *BlockchainIterator) next() *Block {
 	var read *opt.ReadOptions
 
 	if byteBlock, err := iter.DB.Get(iter.CurrentHash, read); err != nil {
-		log.Panic(err)
+		log.Println(err)
 	} else {
 		currentBlock := DecodeBlock(byteBlock)
-
-		if bytes.Compare(currentBlock.Hash(), iter.CurrentHash) != 0 {
-			log.Panic("The chain is invalid")
+		hash := currentBlock.Hash()
+		if hash == nil {
+			return nil
+		} else if currentBlock == nil {
+			return nil
+		} else if bytes.Compare(hash, iter.CurrentHash) != 0 {
+			log.Println("The chain is invalid")
+			return nil
 		}
 		iter.CurrentHash = currentBlock.PreviousHash
 
@@ -150,7 +174,7 @@ func (blockchain *Blockchain) GetLastBlock() *Block {
 		var read *opt.ReadOptions
 
 		if blockByte, err := blockchain.DB.Get(blockchain.LastHash, read); err != nil {
-			log.Panic(err)
+			log.Println(err)
 		} else {
 			return DecodeBlock(blockByte)
 		}
@@ -162,7 +186,11 @@ func (blockchain *Blockchain) GetMemPoolTransactionsHash() []byte {
 	var hashTransactions [][]byte
 
 	for _, transaction := range blockchain.GetMemPoolTransactions() {
-		hashTransactions = append(hashTransactions, transaction.Hash())
+		hash := transaction.Hash()
+		if hash == nil {
+			return nil
+		}
+		hashTransactions = append(hashTransactions, hash)
 	}
 
 	hash := sha256.Sum256(bytes.Join(hashTransactions, []byte{}))
@@ -177,7 +205,7 @@ func (blockchain *Blockchain) GetBlock(blockHash []byte) *Block {
 		if err.Error() == "leveldb: not found" {
 			return nil
 		}
-		log.Panic(err)
+		log.Println(err)
 	} else {
 		return DecodeBlock(blockByte)
 	}
@@ -191,11 +219,16 @@ func (blockchain *Blockchain) GetMerkleRoot(blockHash []byte) []byte {
 
 func (blockchain *Blockchain) CreateBlock(block *Block) (*Block, string) {
 	lastBlock := blockchain.GetLastBlock()
-	if lastBlock.Index+1 != block.Index {
+	hash := lastBlock.Hash()
+	if hash == nil {
+		return nil, "nil last block hash"
+	} else if lastBlock == nil {
+		return nil, "nil last block"
+	} else if lastBlock.Index+1 != block.Index {
 		return nil, "Bad index"
 	} else if !block.ValidateProof() {
 		return nil, "Bad Proof"
-	} else if bytes.Compare(lastBlock.Hash(), block.PreviousHash) != 0 {
+	} else if bytes.Compare(hash, block.PreviousHash) != 0 {
 		return nil, "Bad Previous Hash"
 	} else if !block.Transactions[len(block.Transactions)-1].IsCoinbase() {
 		return nil, "The coinbase needs to be the last transaction of the block"
@@ -216,16 +249,23 @@ func (blockchain *Blockchain) CreateBlock(block *Block) (*Block, string) {
 
 func (blockchain *Blockchain) PersistBlock(block *Block) {
 	if !block.MerkleTree.CheckTree(block.Transactions) {
-		log.Panic("Bad Tree")
+		log.Println("Bad Tree")
+		return
 	} else if bytes.Compare(block.MerkleRoot, block.MerkleTree.RootNode.Data) != 0 {
-		log.Panic("Bad Tree Root")
+		log.Println("Bad Tree Root")
+		return
 	}
 
 	if blockchain.LastHash == nil {
 		var write *opt.WriteOptions
 		hash := block.Hash()
+		if hash == nil {
+			return
+		}
+
 		if err := blockchain.DB.Put([]byte("lastHash"), hash, write); err != nil {
-			log.Panic(err)
+			log.Println(err)
+			return
 		}
 		blockchain.LastHash = hash
 	}
@@ -250,7 +290,9 @@ func (blockchain *Blockchain) TransactionExist(transaction *Transaction, block *
 		if err.Error() == "leveldb: not found" {
 			return false
 		}
-		log.Panic(err)
+		log.Println(err)
+
+		return false
 	}
 
 	return true
@@ -259,24 +301,38 @@ func (blockchain *Blockchain) TransactionExist(transaction *Transaction, block *
 func (blockchain *Blockchain) downloadBlock(block *Block) {
 	var write *opt.WriteOptions
 	hash := block.Hash()
+	if hash == nil {
+		return
+	}
 
-	if err := blockchain.DB.Put(hash, block.EncodeBlock(), write); err != nil {
-		log.Panic(err)
+	byteBlock := block.EncodeBlock()
+	if byteBlock != nil {
+		if err := blockchain.DB.Put(hash, block.EncodeBlock(), write); err != nil {
+			log.Println(err)
+		}
 	}
 }
 
 func (blockchain *Blockchain) AddBlock(block *Block) {
 	var write *opt.WriteOptions
 	hash := block.Hash()
+	if hash == nil {
+		return
+	}
 
 	blockchain.persistUnspentOutputs(block)
 
 	if err := blockchain.DB.Put([]byte("lastHash"), hash, write); err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return
 	}
 
-	if err := blockchain.DB.Put(hash, block.EncodeBlock(), write); err != nil {
-		log.Panic(err)
+	byteBlock := block.EncodeBlock()
+	if byteBlock == nil {
+		return
+	} else if err := blockchain.DB.Put(hash, byteBlock, write); err != nil {
+		log.Println(err)
+		return
 	}
 
 	blockchain.LastHash = hash
@@ -313,7 +369,7 @@ func (blockchain *Blockchain) GetUnspentOutputs(address []byte) *UnspentOutput {
 
 	if outputs, err := blockchain.DB.Get(GenerateUnspentOutputKey(address), read); err != nil {
 		if err.Error() != "leveldb: not found" {
-			log.Panic()
+			log.Println()
 		}
 	} else {
 		return DecodeUnspentOutput(outputs)
@@ -327,7 +383,8 @@ func (blockchain *Blockchain) updateMemPoolTransactions(memPoolTransactions [][]
 
 	for _, hash := range memPoolTransactions {
 		if err := blockchain.DB.Delete(GenerateMemPoolTransactionKey(hash), write); err != nil {
-			log.Panic(err)
+			log.Println(err)
+			return
 		}
 	}
 }
@@ -345,11 +402,11 @@ func (blockchain *Blockchain) updateUnspentOutputs(unspentOuputs *UnspentOutput,
 
 	if len(unspentOuputs.Outputs) > 0 {
 		if err := blockchain.DB.Put(key, unspentOuputs.EncodeUnspentOutput(), write); err != nil {
-			log.Panic(err)
+			log.Println(err)
 		}
 	} else {
 		if err := blockchain.DB.Delete(key, write); err != nil {
-			log.Panic(err)
+			log.Println(err)
 		}
 	}
 }
@@ -398,7 +455,12 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 
 	for iter.Next() {
 		byteTransaction := iter.Value()
-		transactions = append(transactions, DecodeTransaction(byteTransaction))
+
+		transaction := DecodeTransaction(byteTransaction)
+		if transaction == nil {
+			return nil
+		}
+		transactions = append(transactions, transaction)
 	}
 	iter.Release()
 
@@ -407,44 +469,56 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 
 func (blockchain *Blockchain) DownloadMemPool(transactions []*Transaction) {
 	for _, transaction := range transactions {
-		blockchain.persistTransaction(transaction)
+		blockchain.PersistTransaction(transaction)
 	}
 }
 
-func (blockchain *Blockchain) persistTransaction(transaction *Transaction) {
+func (blockchain *Blockchain) PersistTransaction(transaction *Transaction) {
 	var write *opt.WriteOptions
-	key := GenerateMemPoolTransactionKey(transaction.Hash())
+	hash := transaction.Hash()
+	if hash == nil {
+		return
+	}
 
-	if err := blockchain.DB.Put(key, transaction.EncodeTransaction(), write); err != nil {
-		log.Panic(err)
+	key := GenerateMemPoolTransactionKey(hash)
+	byteTransaction := transaction.EncodeTransaction()
+	if byteTransaction == nil {
+		return
+	} else if err := blockchain.DB.Put(key, byteTransaction, write); err != nil {
+		log.Println(err)
+		return
 	}
 }
 
 func (blockchain *Blockchain) CreateTransaction(privateKey, to []byte, amount, fee int, timestamp int64) *Transaction {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return nil
 	}
 
 	fromHash := ValidateAddress(GetPublicKeyFromPrivateKey(privateKey))
 	toHash := ValidateAddress(to)
 
 	if bytes.Compare(fromHash, toHash) == 0 {
-		log.Panic("You can't send money to yourself")
+		log.Println("You can't send money to yourself")
+		return nil
 	}
 
 	unspentOutputs := blockchain.GetUnspentOutputs(fromHash)
 	if unspentOutputs == nil || unspentOutputs.Outputs == nil {
-		log.Panic("You have no money buddy!")
+		log.Println("You have no money buddy!")
+		return nil
 	}
 	outputRest, amountRest := unspentOutputs.GetOutputsForAmount(amount + fee)
 
 	if amountRest > 0 {
-		log.Panic("You don't have enough money")
+		log.Println("You don't have enough money")
+		return nil
 	}
 
 	blockchain.updateUnspentOutputs(&UnspentOutput{outputRest}, fromHash)
 	transaction := CreateTransaction(toHash, fromHash, privateKey, amount, amountRest, fee, timestamp, unspentOutputs)
-	blockchain.persistTransaction(transaction)
+	blockchain.PersistTransaction(transaction)
 
 	return transaction
 }

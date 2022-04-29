@@ -3,8 +3,6 @@ package Models
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
-	"log"
 )
 
 type Tree struct {
@@ -22,31 +20,12 @@ func CreateTree(transactions []*Transaction) *Tree {
 		return nil
 	}
 	treeArray := createTreeArray(transactions)
+	if treeArray == nil {
+		return nil
+	}
 	treeNode := linkNodes(len(treeArray)-1, 0, treeArray)
 
 	return &Tree{treeNode}
-}
-
-func DecodeTree(byteTree []byte) *Tree {
-	var tree Tree
-	decoder := gob.NewDecoder(bytes.NewReader(byteTree))
-
-	if err := decoder.Decode(&tree); err != nil {
-		log.Panic(err)
-	}
-
-	return &tree
-}
-
-func (tree *Tree) EncoreTree() []byte {
-	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
-
-	if err := encoder.Encode(tree); err != nil {
-		log.Panic(err)
-	}
-
-	return buffer.Bytes()
 }
 
 func (tree *Tree) CheckTree(transactions []*Transaction) bool {
@@ -56,7 +35,11 @@ func (tree *Tree) CheckTree(transactions []*Transaction) bool {
 
 	var hash [][]byte
 	for _, transaction := range transactions {
-		hash = append(hash, transaction.Hash())
+		hashTransaction := transaction.Hash()
+		if hashTransaction == nil {
+			return false
+		}
+		hash = append(hash, hashTransaction)
 	}
 
 	return browseTree(tree.RootNode, hash, 0)
@@ -104,7 +87,11 @@ func createTreeArray(transactions []*Transaction) [][][]byte {
 	var row [][]byte
 
 	for _, transaction := range transactions {
-		row = append(row, transaction.Hash())
+		hashTransaction := transaction.Hash()
+		if hashTransaction == nil {
+			return nil
+		}
+		row = append(row, hashTransaction)
 	}
 	treeArray = append(treeArray, row)
 

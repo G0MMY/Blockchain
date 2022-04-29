@@ -2,7 +2,6 @@ package Models
 
 import (
 	"bytes"
-	"github.com/ugorji/go/codec"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -48,38 +47,6 @@ type UnspentOutputsRequest struct {
 	Outputs []Output
 }
 
-type OtherFullNode struct {
-	Address   string
-	Neighbors []string
-}
-
-type UpdateNetwork struct {
-	Received []string
-	Node     OtherFullNode
-}
-
-func (updateNetwork UpdateNetwork) Encode() []byte {
-	var buffer bytes.Buffer
-	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
-
-	if err := encoder.Encode(updateNetwork); err != nil {
-		log.Panic(err)
-	}
-
-	return buffer.Bytes()
-}
-
-func DecodeUpdateNeighbor(byteNeighbor []byte) UpdateNetwork {
-	var updateNetwork UpdateNetwork
-	decoder := codec.NewDecoder(bytes.NewReader(byteNeighbor), new(codec.JsonHandle))
-
-	if err := decoder.Decode(&updateNetwork); err != nil {
-		log.Panic(err)
-	}
-
-	return updateNetwork
-}
-
 func (request UnspentOutputsRequest) CreateUnspentOutput() *UnspentOutput {
 	var outputs []*Output
 
@@ -111,9 +78,12 @@ func (blockRequest BlockRequest) CreateBlock() *Block {
 		transactions = append(transactions, transactionRequest.CreateTransaction())
 	}
 	tree := CreateTree(transactions)
+	if tree == nil {
+		return nil
+	}
 
 	if bytes.Compare(tree.RootNode.Data, blockRequest.MerkleRoot) != 0 {
-		log.Panic("The tree or the merkle root is not valid")
+		log.Println("The tree or the merkle root is not valid")
 	}
 
 	return &Block{blockRequest.Index, blockRequest.Nonce, blockRequest.Timestamp, blockRequest.MerkleRoot, blockRequest.PreviousHash, transactions, tree}
@@ -160,15 +130,18 @@ func ExecutePost(url string, responseBody *bytes.Buffer) []byte {
 	resp, err := http.Post(url, "application/json", responseBody)
 
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
-	} else if resp.Status != "200 OK" {
-		log.Panic(string(body))
+		log.Println(err)
+		return nil
+	} else if resp.StatusCode != 200 {
+		log.Println(string(body))
+		return nil
 	}
 
 	return body
@@ -177,26 +150,18 @@ func ExecutePost(url string, responseBody *bytes.Buffer) []byte {
 func ExecuteGet(url string) []byte {
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
-	} else if resp.Status != "200 OK" {
-		log.Panic(string(body))
+		log.Println(err)
+		return nil
+	} else if resp.StatusCode != 200 {
+		log.Println(string(body))
+		return nil
 	}
 
 	return body
-}
-
-func ReadUserIP(r *http.Request) string {
-	IPAddress := r.Header.Get("X-Real-Ip")
-	if IPAddress == "" {
-		IPAddress = r.Header.Get("X-Forwarded-For")
-	}
-	if IPAddress == "" {
-		IPAddress = r.RemoteAddr
-	}
-	return IPAddress
 }

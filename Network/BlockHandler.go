@@ -96,15 +96,26 @@ func (handler *Handler) CreateBlock(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	block, errorMessage := handler.Node.Blockchain.CreateBlock(body.CreateBlock())
+	CreateBlock <- body
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode("Created block")
+}
 
-	if block == nil {
+func (handler *Handler) AddBlock(w http.ResponseWriter, r *http.Request) {
+	var body Models.BlockRequest
+	decoder := json.NewDecoder(r.Body)
+
+	if err := decoder.Decode(&body); err != nil {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(errorMessage)
-	} else {
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(block)
+		json.NewEncoder(w).Encode(err.Error())
+		return
 	}
+	defer r.Body.Close()
+
+	AddBlock <- body
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode("Added block")
 }

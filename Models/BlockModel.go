@@ -25,24 +25,38 @@ type Block struct {
 
 func CreateGenesisBlock(privateKey []byte) *Block {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return nil
 	}
 	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{0, 0, time.Now().Unix(), nil, []byte{}, []*Transaction{coinbase}, nil}
 	block.addTree()
-	block.Proof()
+	block.proof()
+	if block.Nonce == -1 {
+		return nil
+	}
 
 	return block
 }
 
 func CreateBlock(privateKey []byte, index int, lastHash []byte, transactions []*Transaction) *Block {
-	transactions, _ = FindBestMemPoolTransactions(transactions, NumberOfTransactions, privateKey)
+	transactions = FindBestMemPoolTransactions(transactions, NumberOfTransactions, privateKey)
+	if transactions == nil {
+		return nil
+	}
 	coinbase := CreateCoinbase(privateKey)
 
 	block := &Block{index, 0, time.Now().Unix(), nil, lastHash, append(transactions, coinbase), nil}
 	block.addTree()
-	block.Proof()
+	if block.MerkleRoot == nil {
+		return nil
+	}
+
+	block.proof()
+	if block.Nonce == -1 {
+		return nil
+	}
 
 	return block
 }
@@ -55,7 +69,9 @@ func (block *Block) Validate() bool {
 	}
 
 	for _, transaction := range block.Transactions {
-		transaction.ValidateTransaction()
+		if !transaction.ValidateTransaction(false) {
+			return false
+		}
 	}
 
 	if !block.MerkleTree.CheckTree(block.Transactions) {
@@ -68,7 +84,8 @@ func (block *Block) Validate() bool {
 func (block *Block) addTree() {
 	tree := CreateTree(block.Transactions)
 	if tree == nil {
-		log.Panic("No transactions in the block")
+		log.Println("No transactions in the block")
+		return
 	}
 
 	block.MerkleTree = tree
@@ -80,7 +97,12 @@ func (block *Block) ValidateProof() bool {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-difficulty))
 
-	intHash.SetBytes(block.Hash())
+	hash := block.Hash()
+	if hash == nil {
+		return false
+	}
+
+	intHash.SetBytes(hash)
 	if intHash.Cmp(target) == -1 {
 		return true
 	}
@@ -88,7 +110,7 @@ func (block *Block) ValidateProof() bool {
 	return false
 }
 
-func (block *Block) Proof() {
+func (block *Block) proof() {
 	var intHash big.Int
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-difficulty))
@@ -96,6 +118,11 @@ func (block *Block) Proof() {
 	for true {
 		block.Nonce += 1
 		hash := block.Hash()
+		if hash == nil {
+			block.Nonce = -1
+			return
+		}
+
 		intHash.SetBytes(hash)
 		if intHash.Cmp(target) == -1 {
 			break
@@ -104,7 +131,12 @@ func (block *Block) Proof() {
 }
 
 func (block *Block) Hash() []byte {
-	hash := sha256.Sum256(block.EncodeBlock())
+	byteBlock := block.EncodeBlock()
+	if byteBlock == nil {
+		return nil
+	}
+
+	hash := sha256.Sum256(byteBlock)
 
 	return hash[:]
 }
@@ -124,7 +156,8 @@ func DecodeBlock(byteBlock []byte) *Block {
 	decoder := codec.NewDecoder(bytes.NewReader(byteBlock), new(codec.JsonHandle))
 
 	if err := decoder.Decode(&block); err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return block.CreateBlock()
@@ -135,7 +168,8 @@ func (block *Block) EncodeBlock() []byte {
 	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
 
 	if err := encoder.Encode(block.CreateBlockRequest()); err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return buffer.Bytes()

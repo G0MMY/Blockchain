@@ -3,6 +3,7 @@ package Network
 import (
 	"blockchain/Models"
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -12,31 +13,33 @@ import (
 )
 
 var (
-	minNeighbors = 5
+	minChecks         = 5
+	AddNode           chan string
+	CreateBlock       chan Models.BlockRequest
+	AddBlock          chan Models.BlockRequest
+	CreateTransaction chan Models.TransactionRequest
+	AddTransaction    chan Models.CreateTransactionRequest
 )
 
 type FullNode struct {
-	Neighbors  []string
-	AllNodes   []Models.OtherFullNode
+	AllNodes   []string
 	Address    string
 	Blockchain *Models.Blockchain
 }
 
-type numberNeighbor struct {
-	address string
-	number  int
-}
-
-func InitializeNode(port string, allNodes []Models.OtherFullNode) {
-	node := &FullNode{nil, allNodes, port, nil}
-	node.getNeighbors()
-	node.addToNetwork()
+func InitializeNode(port string, allNodes []string) {
+	node := &FullNode{allNodes, port, nil}
 
 	//node.Blockchain = Models.InitTestBlockchain(Models.CreateWallet().PrivateKey)
 	node.Blockchain = Models.InitBlockchain(port)
-	if node.Blockchain.LastHash == nil {
-		node.getBlockchain()
+	if node.Blockchain == nil {
+		return
+	} else if node.Blockchain.LastHash == nil {
+		if !node.getBlockchain() {
+			return
+		}
 	}
+	node.initializeAllNodes()
 
 	handler := New(node)
 	router := mux.NewRouter()
@@ -45,6 +48,7 @@ func InitializeNode(port string, allNodes []Models.OtherFullNode) {
 	router.HandleFunc("/memPoolTransactions/hash", handler.GetMemPoolTransactionsHash).Methods(http.MethodGet)
 	router.HandleFunc("/merkleRoot/{blockHash}", handler.GetBlockMerkleRoot).Methods(http.MethodGet)
 	router.HandleFunc("/unspentOutputs/hash", handler.GetAllUnspentOutputsHash).Methods(http.MethodGet)
+	router.HandleFunc("/network", handler.GetNetwork).Methods(http.MethodGet)
 
 	router.HandleFunc("/memPoolTransactions", handler.GetMemPoolTransactions).Methods(http.MethodGet)
 	router.HandleFunc("/block/{blockHash}", handler.GetBlock).Methods(http.MethodGet)
@@ -57,215 +61,194 @@ func InitializeNode(port string, allNodes []Models.OtherFullNode) {
 	router.HandleFunc("/create/transaction", handler.CreateTransaction).Methods(http.MethodPost)
 	router.HandleFunc("/create/block", handler.CreateBlock).Methods(http.MethodPost)
 
-	router.HandleFunc("/update/neighbor", handler.UpdateNeighbor).Methods(http.MethodPost)
-
-	router.HandleFunc("/add/neighbor", handler.AddNeighbor).Methods(http.MethodPost)
 	router.HandleFunc("/add/node", handler.AddNode).Methods(http.MethodPost)
+	router.HandleFunc("/add/block", handler.AddBlock).Methods(http.MethodPost)
+	router.HandleFunc("/add/transaction", handler.AddTransaction).Methods(http.MethodPost)
+
+	AddNode = make(chan string, 100)
+	CreateBlock = make(chan Models.BlockRequest, 100)
+	AddBlock = make(chan Models.BlockRequest, 100)
+	AddTransaction = make(chan Models.CreateTransactionRequest, 100)
+	CreateTransaction = make(chan Models.TransactionRequest, 100)
+
+	go addNodeWorker(AddNode, node)
+	go createBlockWorker(CreateBlock, node)
+	go addBLockWorker(AddBlock, node)
+	go addTransactionWorker(AddTransaction, node)
+	go createTransactionWorker(CreateTransaction, node)
 
 	log.Println("running")
 	http.ListenAndServe(":"+port, router)
 }
 
-func (node *FullNode) getNeighbors() {
-	if node.AllNodes == nil {
+func createBlockWorker(createBlock <-chan Models.BlockRequest, node *FullNode) {
+	for blockRequest := range createBlock {
+		node.createBlock(blockRequest)
+	}
+}
+
+func addBLockWorker(addBlock <-chan Models.BlockRequest, node *FullNode) {
+	for block := range addBlock {
+		node.addBlock(block)
+	}
+}
+
+func addNodeWorker(addNode <-chan string, node *FullNode) {
+	for update := range addNode {
+		node.addNode(update)
+	}
+}
+
+func addTransactionWorker(addTransaction <-chan Models.CreateTransactionRequest, node *FullNode) {
+	for transaction := range addTransaction {
+		node.addTransaction(transaction)
+	}
+}
+
+func createTransactionWorker(createTransaction <-chan Models.TransactionRequest, node *FullNode) {
+	for transaction := range createTransaction {
+		node.createTransaction(transaction)
+	}
+}
+
+func (node *FullNode) createTransaction(transactionRequest Models.TransactionRequest) {
+	transaction := transactionRequest.CreateTransaction()
+	if !transaction.ValidateTransaction(true) {
+		return
+	}
+	node.Blockchain.PersistTransaction(transaction)
+}
+
+func (node *FullNode) addTransaction(transactionRequest Models.CreateTransactionRequest) {
+	priv, err := hex.DecodeString(transactionRequest.PrivateKey)
+	if err != nil {
+		log.Println(err)
 		return
 	}
 
-	numberNeighborsPerNode := make(map[string]int)
-
-	for _, otherNode := range node.AllNodes {
-		if len(otherNode.Neighbors) == 0 {
-			numberNeighborsPerNode[otherNode.Address] = 0
-		}
-		for _, address := range otherNode.Neighbors {
-			if val, ok := numberNeighborsPerNode[address]; ok {
-				numberNeighborsPerNode[address] = val + 1
-			} else {
-				numberNeighborsPerNode[address] = 1
-			}
-		}
-	}
-
-	var otherNodeArray []numberNeighbor
-	for key, value := range numberNeighborsPerNode {
-		if len(otherNodeArray) < minNeighbors {
-			otherNodeArray = append(otherNodeArray, numberNeighbor{key, value})
-		} else {
-			for i, otherNode := range otherNodeArray {
-				if otherNode.number > value {
-					otherNodeArray = append(otherNodeArray[:i+1], otherNodeArray[i:]...)
-					otherNodeArray[i] = numberNeighbor{key, value}
-				}
-			}
-		}
-	}
-
-	for _, otherNode := range otherNodeArray {
-		node.UpdateNeighbors(otherNode.address)
-	}
-}
-
-func (node *FullNode) UpdateAllNodes(newNode Models.UpdateNetwork) {
-	neighbors := node.Neighbors
-	for _, received := range newNode.Received {
-		if received == node.Address {
-			return
-		} else {
-			for i, neighbor := range neighbors {
-				if neighbor == received {
-					neighbors = append(neighbors[:i], neighbors[i+1:]...)
-					break
-				}
-			}
-		}
-	}
-	for _, otherNode := range node.AllNodes {
-		if otherNode.Address == newNode.Node.Address {
-			return
-		}
-	}
-
-	node.AllNodes = append(node.AllNodes, newNode.Node)
-	newNode.Received = append(newNode.Received, node.Address)
-
-	for _, neighbor := range neighbors {
-		postBody, _ := json.Marshal(map[string][]byte{
-			"node": newNode.Encode(),
-		})
-		responseBody := bytes.NewBuffer(postBody)
-		go Models.ExecutePost("http://localhost:"+neighbor+"/add/node", responseBody)
-	}
-}
-
-func (node *FullNode) UpdateNodeNeighbor(update Models.UpdateNetwork) {
-	neighbors := node.Neighbors
-	for _, received := range update.Received {
-		if received == node.Address {
-			return
-		} else {
-			for i, neighbor := range neighbors {
-				if neighbor == received {
-					neighbors = append(neighbors[:i], neighbors[i+1:]...)
-					break
-				}
-			}
-		}
-	}
-	update.Received = append(update.Received, node.Address)
-
-	for i, otherFullNode := range node.AllNodes {
-		if update.Node.Address == otherFullNode.Address {
-			node.AllNodes[i] = update.Node
-			break
-		}
-	}
-
-	for _, neighbor := range neighbors {
-		postBody, _ := json.Marshal(map[string][]byte{
-			"node": update.Encode(),
-		})
-		responseBody := bytes.NewBuffer(postBody)
-		go Models.ExecutePost("http://localhost:"+neighbor+"/update/neighbor", responseBody)
-	}
-}
-
-func (node *FullNode) UpdateNeighbors(address string) []string {
-	for _, neighbor := range node.Neighbors {
-		if neighbor == address || address == node.Address {
-			return node.Neighbors
-		}
-	}
-
-	neighbors := append(node.Neighbors, address)
-	for _, neighbor := range node.Neighbors {
-		postBody, _ := json.Marshal(map[string][]byte{
-			"node": Models.UpdateNetwork{[]string{node.Address}, Models.OtherFullNode{node.Address, neighbors}}.Encode(),
-		})
-		responseBody := bytes.NewBuffer(postBody)
-		go Models.ExecutePost("http://localhost:"+neighbor+"/update/neighbor", responseBody)
-	}
-
-	node.Neighbors = neighbors
-	for i, otherNode := range node.AllNodes {
-		if node.Address == otherNode.Address {
-			node.AllNodes[i].Neighbors = neighbors
-			break
-		}
-	}
-
-	return node.Neighbors
-}
-
-func (node *FullNode) addToNetwork() {
-	if node.AllNodes == nil {
-		node.AllNodes = append(node.AllNodes, Models.OtherFullNode{node.Address, nil})
+	to, err := hex.DecodeString(transactionRequest.To)
+	if err != nil {
+		log.Println(err)
 		return
 	}
 
-	var otherNodes []Models.OtherFullNode
-	for _, otherNode := range node.AllNodes {
-		if otherNode.Address != node.Address {
-			if len(otherNodes) == 0 {
-				otherNodes = append(otherNodes, otherNode)
-			} else {
-				for i, otherFullNode := range otherNodes {
-					if len(otherFullNode.Neighbors) > len(otherNode.Neighbors) {
-						otherNodes = append(otherNodes[:i+1], otherNodes[i:]...)
-						otherNodes[i] = otherNode
-						break
-					}
+	transaction := node.Blockchain.CreateTransaction(priv, to, transactionRequest.Amount, transactionRequest.Fee, transactionRequest.Timestamp)
+	if transaction != nil {
+		for _, otherNode := range node.AllNodes {
+			if otherNode != node.Address {
+				byteTransaction := transaction.EncodeTransaction()
+				if byteTransaction == nil {
+					return
 				}
+
+				body := bytes.NewBuffer(byteTransaction)
+				go Models.ExecutePost("http://localhost:"+otherNode+"/create/transaction", body)
 			}
 		}
+	} else {
+		log.Println("Bad Transaction")
 	}
-	newNode := Models.UpdateNetwork{[]string{node.Address}, Models.OtherFullNode{node.Address, node.Neighbors}}
-	node.AllNodes = append(node.AllNodes, Models.OtherFullNode{node.Address, node.Neighbors})
+}
 
-	i := 0
-	for i < minNeighbors {
-		if i >= len(otherNodes) {
+func (node *FullNode) createBlock(blockRequest Models.BlockRequest) {
+	block := blockRequest.CreateBlock()
+	if block == nil {
+		return
+	}
+	node.Blockchain.CreateBlock(block)
+}
+
+func (node *FullNode) addBlock(blockRequest Models.BlockRequest) {
+	block := blockRequest.CreateBlock()
+	if block == nil {
+		return
+	}
+	_, err := node.Blockchain.CreateBlock(block)
+
+	if err == "" {
+		for _, otherNode := range node.AllNodes {
+			if otherNode != node.Address {
+				body := bytes.NewBuffer(block.EncodeBlock())
+				go Models.ExecutePost("http://localhost:"+otherNode+"/create/block", body)
+			}
+		}
+	} else {
+		log.Println(err)
+	}
+}
+
+func (node *FullNode) addNode(address string) {
+	for _, currentNode := range node.AllNodes {
+		if currentNode == address {
 			return
 		}
-		for j, otherNode := range node.AllNodes {
-			if otherNode.Address == otherNodes[i].Address {
-				node.AllNodes[j] = Models.OtherFullNode{otherNode.Address, append(otherNode.Neighbors, node.Address)}
-			}
+	}
+
+	node.AllNodes = append(node.AllNodes, address)
+}
+
+func (node *FullNode) initializeAllNodes() {
+	for _, currentNode := range node.AllNodes {
+		if currentNode == node.Address {
+			return
 		}
-		postBody, _ := json.Marshal(map[string]string{
+	}
+
+	for _, currentNode := range node.AllNodes {
+		byteBody, err := json.Marshal(map[string]string{
 			"address": node.Address,
 		})
-		responseBody := bytes.NewBuffer(postBody)
-		Models.ExecutePost("http://localhost:"+otherNodes[i].Address+"/add/neighbor", responseBody)
 
-		postBody, _ = json.Marshal(map[string][]byte{
-			"node": newNode.Encode(),
-		})
-		responseBody = bytes.NewBuffer(postBody)
-		Models.ExecutePost("http://localhost:"+otherNodes[i].Address+"/add/node", responseBody)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
-		i += 1
+		body := bytes.NewBuffer(byteBody)
+		go Models.ExecutePost("http://localhost:"+currentNode+"/add/node", body)
 	}
+	node.AllNodes = append(node.AllNodes, node.Address)
 }
 
-func (node *FullNode) getBlockchain() {
+func (node *FullNode) getBlockchain() bool {
 	lastHash := node.initializeLastHash()
-	node.initializeBlocks(lastHash)
-	node.initializeUnspentOutputs()
-	node.initializeMemPoolTransactions()
+	if lastHash == "" {
+		return false
+	}
+	if !node.initializeBlocks(lastHash) {
+		return false
+	}
+	if !node.initializeUnspentOutputs() {
+		return false
+	}
+	if !node.initializeMemPoolTransactions() {
+		return false
+	}
+
+	return true
 }
 
 func (node *FullNode) initializeLastHash() string {
-	neighbor := rand.Intn(len(node.Neighbors))
+	neighbor := rand.Intn(len(node.AllNodes))
 
-	bodyString := string(Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/lastHash"))
+	lastHash := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/lastHash")
+	if lastHash == nil {
+		return ""
+	}
+	bodyString := string(lastHash)
 	bodyString = bodyString[1 : len(bodyString)-2]
 
 	j := 0
-	for j < len(node.Neighbors) {
+	for j < minChecks && j < len(node.AllNodes) {
 		if j != neighbor {
-			body := string(Models.ExecuteGet("http://localhost:" + node.Neighbors[j] + "/lastHash"))
+			lastHash = Models.ExecuteGet("http://localhost:" + node.AllNodes[j] + "/lastHash")
+			if lastHash == nil {
+				return ""
+			}
+			body := string(lastHash)
 			if bodyString != body[1:len(body)-2] {
-				log.Panic("There is a node with an invalid last hash")
+				log.Println("There is a node with an invalid last hash")
+				return ""
 			}
 		}
 		j += 1
@@ -274,59 +257,88 @@ func (node *FullNode) initializeLastHash() string {
 	return bodyString
 }
 
-func (node *FullNode) initializeMemPoolTransactions() {
-	neighbor := rand.Intn(len(node.Neighbors))
-	body := Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/memPoolTransactions")
+func (node *FullNode) initializeMemPoolTransactions() bool {
+	neighbor := rand.Intn(len(node.AllNodes))
+	body := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/memPoolTransactions")
+	if body == nil {
+		return false
+	}
 	var transactions []*Models.Transaction
 	json.Unmarshal(body, &transactions)
 
-	transactionsHash := fmt.Sprintf("%x", Models.HashTransactions(transactions))
+	hash := Models.HashTransactions(transactions)
+	if hash == nil {
+		return false
+	}
+	transactionsHash := fmt.Sprintf("%x", hash)
 	j := 0
-	for j < len(node.Neighbors) {
+	for j < minChecks && j < len(node.AllNodes) {
 		if j != neighbor {
-			hashString := string(Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/memPoolTransactions/hash"))
+			hash := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/memPoolTransactions/hash")
+			if hash == nil {
+				return false
+			}
+			hashString := string(hash)
 
 			if transactionsHash != hashString[1:len(hashString)-2] {
-				log.Panic("There is a node with an invalid unspentOutput hash")
+				log.Println("There is a node with an invalid unspentOutput hash")
+				return false
 			}
 		}
 		j += 1
 	}
-
 	node.Blockchain.DownloadMemPool(transactions)
+
+	return true
 }
 
-func (node *FullNode) initializeUnspentOutputs() {
-	neighbor := rand.Intn(len(node.Neighbors))
-	body := Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/unspentOutputs")
+func (node *FullNode) initializeUnspentOutputs() bool {
+	neighbor := rand.Intn(len(node.AllNodes))
+	body := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/unspentOutputs")
+	if body == nil {
+		return false
+	}
 	unspentOutputs := make(map[string]*Models.UnspentOutput)
 	json.Unmarshal(body, &unspentOutputs)
 
 	unspentOutputHashString := fmt.Sprintf("%x", Models.HashUnspentOutputs(unspentOutputs))
 	j := 0
-	for j < len(node.Neighbors) {
+	for j < minChecks && j < len(node.AllNodes) {
 		if j != neighbor {
-			hashString := string(Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/unspentOutputs/hash"))
+			hash := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/unspentOutputs/hash")
+			if hash == nil {
+				return false
+			}
+			hashString := string(hash)
 
 			if unspentOutputHashString != hashString[1:len(hashString)-2] {
-				log.Panic("There is a node with an invalid unspentOutput hash")
+				log.Println("There is a node with an invalid unspentOutput hash")
+				return false
 			}
 		}
 		j += 1
 	}
-
 	node.Blockchain.DownloadUnspentOutputs(unspentOutputs)
+
+	return true
 }
 
-func (node *FullNode) initializeBlocks(lastHash string) {
-	neighbor := rand.Intn(len(node.Neighbors))
-	body := Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/block/" + lastHash)
+func (node *FullNode) initializeBlocks(lastHash string) bool {
+	neighbor := rand.Intn(len(node.AllNodes))
+	body := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/block/" + lastHash)
+	if body == nil {
+		return false
+	}
 	blockRequest := Models.BlockRequest{}
 	json.Unmarshal(body, &blockRequest)
 
 	block := blockRequest.CreateBlock()
+	if block == nil {
+		return false
+	}
 	if !block.Validate() {
-		log.Panic("Invalid block")
+		log.Println("Invalid block")
+		return false
 	}
 	lastBlock := block
 	node.Blockchain.PersistBlock(block)
@@ -337,21 +349,33 @@ func (node *FullNode) initializeBlocks(lastHash string) {
 		}
 
 		lastHash = fmt.Sprintf("%x", blockRequest.PreviousHash)
-		body = Models.ExecuteGet("http://localhost:" + node.Neighbors[neighbor] + "/block/" + lastHash)
+		body = Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/block/" + lastHash)
+		if body == nil {
+			return false
+		}
 
 		blockRequest = Models.BlockRequest{}
 		json.Unmarshal(body, &blockRequest)
 		block = blockRequest.CreateBlock()
+		if block == nil {
+			return false
+		}
 		if !block.Validate() {
-			log.Panic("Invalid block")
+			log.Println("Invalid block")
+			return false
 		}
 
-		if bytes.Compare(lastBlock.PreviousHash, block.Hash()) != 0 {
-			log.Panic("Wrong block")
+		hash := block.Hash()
+		if hash == nil {
+			return false
+		} else if bytes.Compare(lastBlock.PreviousHash, hash) != 0 {
+			log.Println("Wrong block")
+			return false
 		}
+
 		lastBlock = block
 		node.Blockchain.PersistBlock(block)
 	}
 
-	node.Blockchain.ValidateBlockchain()
+	return node.Blockchain.ValidateBlockchain()
 }

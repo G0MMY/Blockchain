@@ -36,6 +36,9 @@ func TestCreateBlock(t *testing.T) {
 	}
 	lastBlock := blockchain.GetLastBlock()
 	block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), blockchain.GetMemPoolTransactions())
+	if block == nil {
+		t.Error("invalid tree")
+	}
 	block, err := blockchain.CreateBlock(block)
 
 	if err != "" {
@@ -101,6 +104,9 @@ func TestTransactionsInBlock(t *testing.T) {
 
 	lastBlock := blockchain.GetLastBlock()
 	block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
+	if block == nil {
+		t.Error("invalid tree")
+	}
 	block, err := blockchain.CreateBlock(block)
 
 	if err != "" {
@@ -114,7 +120,7 @@ func TestTransactionsInBlock(t *testing.T) {
 	hasCoinbase := false
 	fees := 0
 	for _, transaction := range block.Transactions {
-		transaction.ValidateTransaction()
+		transaction.ValidateTransaction(false)
 		if !hasCoinbase && transaction.IsCoinbase() {
 			hasCoinbase = true
 		}
@@ -143,6 +149,9 @@ func TestMultipleTransactions(t *testing.T) {
 		lastBlock := blockchain.GetLastBlock()
 		memPool := blockchain.GetMemPoolTransactions()
 		block := Models.CreateBlock(wallet1.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
+		if block == nil {
+			t.Error("invalid tree")
+		}
 		block, err := blockchain.CreateBlock(block)
 
 		if err != "" {
@@ -159,6 +168,9 @@ func TestMultipleTransactions(t *testing.T) {
 	lastBlock := blockchain.GetLastBlock()
 	memPool := blockchain.GetMemPoolTransactions()
 	block1 := Models.CreateBlock(wallet2.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
+	if block1 == nil {
+		t.Error("invalid tree")
+	}
 	block1, err := blockchain.CreateBlock(block1)
 
 	if err != "" {
@@ -169,6 +181,9 @@ func TestMultipleTransactions(t *testing.T) {
 	lastBlock = blockchain.GetLastBlock()
 	memPool = blockchain.GetMemPoolTransactions()
 	block2 := Models.CreateBlock(wallet2.PrivateKey, lastBlock.Index+1, lastBlock.Hash(), memPool)
+	if block2 == nil {
+		t.Error("invalid tree")
+	}
 	block2, err = blockchain.CreateBlock(block2)
 
 	if err != "" {

@@ -30,7 +30,8 @@ func CreateWallet() *Wallet {
 	private, err := ecdsa.GenerateKey(curve, rand.Reader)
 
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return &Wallet{}
 	}
 
 	publicKey := private.Public()
@@ -59,7 +60,7 @@ func IsValidPublicKey(publicKey []byte) bool {
 func EncodePublicKey(public crypto.PublicKey) []byte {
 	publicKey, err := x509.MarshalPKIXPublicKey(public)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
 	}
 
 	return publicKey
@@ -68,7 +69,8 @@ func EncodePublicKey(public crypto.PublicKey) []byte {
 func EncodePrivateKey(private *ecdsa.PrivateKey) []byte {
 	privateKey, err := x509.MarshalECPrivateKey(private)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return privateKey
@@ -76,11 +78,13 @@ func EncodePrivateKey(private *ecdsa.PrivateKey) []byte {
 
 func DecodePublicKey(publicKey []byte) *ecdsa.PublicKey {
 	if !IsValidPublicKey(publicKey) {
-		log.Panic("Invalid Public Key")
+		log.Println("Invalid Public Key")
+		return nil
 	}
 	key, err := x509.ParsePKIXPublicKey(publicKey)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return key.(*ecdsa.PublicKey)
@@ -88,11 +92,13 @@ func DecodePublicKey(publicKey []byte) *ecdsa.PublicKey {
 
 func DecodePrivateKey(privateKey []byte) *ecdsa.PrivateKey {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid Private Key")
+		log.Println("Invalid Private Key")
+		return nil
 	}
 	key, err := x509.ParseECPrivateKey(privateKey)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return key
@@ -143,7 +149,8 @@ func IsValidAddress(address []byte) bool {
 
 func GetPublicKeyFromPrivateKey(privateKey []byte) []byte {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return nil
 	}
 
 	priv := DecodePrivateKey(privateKey)
@@ -157,7 +164,8 @@ func GetPublicKeyHash(publicKey []byte) []byte {
 	hasher := ripemd160.New()
 	_, err := hasher.Write(shaHash[:])
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return hasher.Sum(nil)
@@ -169,7 +177,7 @@ func ValidateAddress(address []byte) []byte {
 	} else if IsValidAddress(address) {
 		return GetPublicKeyHashFromAddress(address)
 	} else {
-		log.Panic("Invalid address provided")
+		log.Println("Invalid address provided")
 	}
 
 	return []byte{}
@@ -177,7 +185,8 @@ func ValidateAddress(address []byte) []byte {
 
 func Sign(amount int, privateKey []byte) []byte {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return nil
 	}
 
 	priv := DecodePrivateKey(privateKey)
@@ -185,7 +194,8 @@ func Sign(amount int, privateKey []byte) []byte {
 	signature, err := ecdsa.SignASN1(rand.Reader, priv, HashInt(amount))
 
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return signature
@@ -199,7 +209,8 @@ func HashInt(value int) []byte {
 
 func ValidateSignature(amount int, publicKey, signature []byte) bool {
 	if !IsValidPublicKey(publicKey) {
-		log.Panic("Invalid public key")
+		log.Println("Invalid public key")
+		return false
 	}
 
 	return ecdsa.VerifyASN1(DecodePublicKey(publicKey), HashInt(amount), signature)

@@ -57,12 +57,12 @@ func CreateTransaction(to, from, privateKey []byte, amount, amountRest, fee int,
 	return &Transaction{inputs, outputs, timestamp, fee}
 }
 
-func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int, privateKey []byte) ([]*Transaction, [][]byte) {
+func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions int, privateKey []byte) []*Transaction {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return nil
 	}
 	var memPoolTransactions []*Transaction
-	var transactionsHash [][]byte
 
 	if len(transactions) > 0 {
 		sort.Slice(transactions, func(i, j int) bool {
@@ -73,9 +73,9 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 		for i < len(transactions) {
 			if transactions[i].Timestamp <= time.Now().Unix() {
 				if len(memPoolTransactions) < numberTransactions-1 {
-					transactionsHash = append(transactionsHash, transactions[i].Hash())
-					transactions[i].addFeeOutput(privateKey)
-					transactions[i].ValidateTransaction()
+					if !transactions[i].addFeeOutput(privateKey) || !transactions[i].ValidateTransaction(true) {
+						return nil
+					}
 					memPoolTransactions = append(memPoolTransactions, transactions[i])
 				} else {
 					break
@@ -85,7 +85,7 @@ func FindBestMemPoolTransactions(transactions []*Transaction, numberTransactions
 		}
 	}
 
-	return memPoolTransactions, transactionsHash
+	return memPoolTransactions
 }
 
 func HashUnspentOutputs(unspentOutputs map[string]*UnspentOutput) []byte {
@@ -103,7 +103,11 @@ func HashTransactions(transactions []*Transaction) []byte {
 	var byteTransactions [][]byte
 
 	for _, transaction := range transactions {
-		byteTransactions = append(byteTransactions, transaction.Hash())
+		hashTransaction := transaction.Hash()
+		if hashTransaction == nil {
+			return nil
+		}
+		byteTransactions = append(byteTransactions, hashTransaction)
 	}
 
 	hash := sha256.Sum256(bytes.Join(byteTransactions, []byte{}))
@@ -126,19 +130,24 @@ func (transaction *Transaction) GetMemPoolHash(block *Block) []byte {
 	return temp.Hash()
 }
 
-func (transaction *Transaction) addFeeOutput(privateKey []byte) {
+func (transaction *Transaction) addFeeOutput(privateKey []byte) bool {
 	if !IsValidPrivateKey(privateKey) {
-		log.Panic("Invalid private key")
+		log.Println("Invalid private key")
+		return false
 	}
 	transaction.Outputs = append(transaction.Outputs, &Output{ValidateAddress(GetPublicKeyFromPrivateKey(privateKey)), transaction.Fee})
+
+	return true
 }
 
-func (transaction *Transaction) ValidateTransaction() {
+func (transaction *Transaction) ValidateTransaction(isMemPool bool) bool {
 	inputAmount := 0
 	for _, input := range transaction.Inputs {
 		inputAmount += input.Output.Amount
 		if !ValidateSignature(input.Output.Amount, input.PublicKey, input.Signature) {
-			log.Panic("Invalid signature")
+			log.Println("Invalid signature")
+
+			return false
 		}
 	}
 
@@ -147,13 +156,25 @@ func (transaction *Transaction) ValidateTransaction() {
 		outputAmount += output.Amount
 	}
 
-	if inputAmount != outputAmount {
-		log.Panic("Not all money is there")
+	if !isMemPool && inputAmount != outputAmount {
+		log.Println("Not all money is there")
+
+		return false
+	} else if isMemPool && inputAmount-outputAmount != transaction.Fee {
+		log.Println("The transaction output's are broken")
+
+		return false
 	}
+
+	return true
 }
 
 func (transaction *Transaction) Hash() []byte {
-	hash := sha256.Sum256(transaction.EncodeTransaction())
+	byteTransaction := transaction.EncodeTransaction()
+	if byteTransaction == nil {
+		return nil
+	}
+	hash := sha256.Sum256(byteTransaction)
 
 	return hash[:]
 }
@@ -171,7 +192,8 @@ func (transaction *Transaction) EncodeTransaction() []byte {
 	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
 
 	if err := encoder.Encode(transaction.CreateTransactionRequest()); err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return buffer.Bytes()
@@ -182,7 +204,8 @@ func DecodeTransaction(byteTransaction []byte) *Transaction {
 	decoder := codec.NewDecoder(bytes.NewReader(byteTransaction), new(codec.JsonHandle))
 
 	if err := decoder.Decode(&transaction); err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil
 	}
 
 	return transaction.CreateTransaction()
@@ -202,7 +225,7 @@ func (unspentOutput *UnspentOutput) GetOutputsForAmount(amount int) ([]*Output, 
 	var outputs []*Output
 
 	if len(unspentOutput.Outputs) == 0 {
-		log.Panic("No unspent outputs to choose from")
+		log.Println("No unspent outputs to choose from")
 	}
 
 	sort.Slice(unspentOutput.Outputs, func(i, j int) bool {
@@ -264,7 +287,7 @@ func (unspentOutput *UnspentOutput) EncodeUnspentOutput() []byte {
 	encoder := codec.NewEncoder(&buffer, new(codec.JsonHandle))
 
 	if err := encoder.Encode(unspentOutput.CreateUnspentOutputRequest()); err != nil {
-		log.Panic(err)
+		log.Println(err)
 	}
 
 	return buffer.Bytes()
@@ -275,7 +298,7 @@ func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
 	decoder := codec.NewDecoder(bytes.NewReader(byteOutput), new(codec.JsonHandle))
 
 	if err := decoder.Decode(&unspentOutput); err != nil {
-		log.Panic(err)
+		log.Println(err)
 	}
 
 	return unspentOutput.CreateUnspentOutput()
