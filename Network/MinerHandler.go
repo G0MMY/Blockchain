@@ -18,6 +18,7 @@ func (handler *HandlerMiner) MineBlock(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	Stop <- body.LastIndex
 	MineBlock <- body
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

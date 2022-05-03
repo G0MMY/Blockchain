@@ -13,30 +13,31 @@ import (
 
 var (
 	MineBlock chan Models.MineBlockRequest
+	Stop      chan int
 )
 
 type Miner struct {
 	Address      string
 	FullNode     string
-	running      bool
 	privateKey   []byte
+	stop         bool
 	CurrentBlock Models.MineBlockRequest
 }
 
 func InitializeMiner(port string, node string, privateKey []byte) {
-	miner := &Miner{port, node, false, privateKey, Models.MineBlockRequest{}}
+	miner := &Miner{port, node, privateKey, false, Models.MineBlockRequest{}}
 
 	if !miner.AddToNode(node) {
 		log.Println("Bad node")
 		return
 	}
-
 	handler := NewMiner(miner)
 	router := mux.NewRouter()
 
 	router.HandleFunc("/mine/block", handler.MineBlock).Methods(http.MethodPost)
 
 	MineBlock = make(chan Models.MineBlockRequest, 100)
+	Stop = make(chan int, 100)
 
 	go mineBlockWorker(MineBlock, miner)
 
@@ -45,36 +46,37 @@ func InitializeMiner(port string, node string, privateKey []byte) {
 }
 
 func mineBlockWorker(mineBlock <-chan Models.MineBlockRequest, miner *Miner) {
-	for mineBlockRequest := range mineBlock {
-		miner.Stop()
-		miner.CurrentBlock = mineBlockRequest
-		go miner.Start()
+	for {
+		select {
+		case block := <-mineBlock:
+			miner.start(block)
+		}
 	}
 }
 
-func (miner *Miner) Start() {
-	if miner.CurrentBlock.Hash != nil {
-		miner.running = true
-		block := Models.CreateBlockMiner(miner.privateKey, miner.CurrentBlock.LastIndex+1, miner.CurrentBlock.Hash, miner.CurrentBlock.MemPoolTransactions)
-		if miner.Mine(block) {
+func (miner *Miner) start(mineBlock Models.MineBlockRequest) {
+	if mineBlock.Hash != nil {
+		block := Models.CreateBlockMiner(miner.privateKey, mineBlock.LastIndex+1, mineBlock.Hash, mineBlock.MemPoolTransactions)
+		if miner.mine(block) {
 			body := bytes.NewBuffer(block.EncodeBlock())
 			Models.ExecutePost("http://localhost:"+miner.FullNode+"/add/block", body)
 		}
 	}
-	miner.running = false
 }
 
-func (miner *Miner) Mine(block *Models.Block) bool {
-	if miner.running {
-		var intHash big.Int
-		target := big.NewInt(1)
-		target.Lsh(target, uint(256-Models.Difficulty))
+func (miner *Miner) mine(block *Models.Block) bool {
+	var intHash big.Int
+	target := big.NewInt(1)
+	target.Lsh(target, uint(256-Models.Difficulty))
 
-		time.Sleep(10 * time.Second)
-		for true {
-			if !miner.running {
+	time.Sleep(5 * time.Second)
+	for {
+		select {
+		case index := <-Stop:
+			if index != block.Index-1 {
 				return false
 			}
+		default:
 			block.Nonce += 1
 			hash := block.Hash()
 			if hash == nil {
@@ -84,16 +86,10 @@ func (miner *Miner) Mine(block *Models.Block) bool {
 
 			intHash.SetBytes(hash)
 			if intHash.Cmp(target) == -1 {
-				break
+				return true
 			}
 		}
 	}
-
-	return true
-}
-
-func (miner *Miner) Stop() {
-	miner.running = false
 }
 
 func (miner *Miner) AddToNode(node string) bool {

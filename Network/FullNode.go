@@ -80,13 +80,13 @@ func InitializeNode(port string, allNodes []string) {
 	go addBLockWorker(AddBlock, node)
 	go addTransactionWorker(AddTransaction, node)
 	go createTransactionWorker(CreateTransaction, node)
-	go addMiner(AddMiner, node)
+	go addMinerWorker(AddMiner, node)
 
 	log.Println("running")
 	http.ListenAndServe(":"+port, router)
 }
 
-func addMiner(addMiner <-chan string, node *FullNode) {
+func addMinerWorker(addMiner <-chan string, node *FullNode) {
 	for miner := range addMiner {
 		node.addMiner(miner)
 	}
@@ -123,13 +123,6 @@ func createTransactionWorker(createTransaction <-chan Models.TransactionRequest,
 }
 
 func (node *FullNode) addMiner(miner string) {
-	for _, address := range node.Miners {
-		if address == miner {
-			return
-		}
-	}
-
-	node.Miners = append(node.Miners, miner)
 	memPool := node.Blockchain.GetMemPoolTransactions()
 	lastBlock := node.Blockchain.GetLastBlock()
 	hash := lastBlock.Hash()
@@ -137,6 +130,14 @@ func (node *FullNode) addMiner(miner string) {
 		return
 	}
 	sendBlockToMiner(memPool, lastBlock, hash, miner)
+
+	for _, address := range node.Miners {
+		if address == miner {
+			return
+		}
+	}
+
+	node.Miners = append(node.Miners, miner)
 }
 
 func (node *FullNode) createTransaction(transactionRequest Models.TransactionRequest) {
