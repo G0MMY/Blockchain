@@ -10,7 +10,9 @@ import (
 )
 
 var (
-	coinbaseAmount = 50
+	MemPoolPrefix       = []byte("MemPool-")
+	UnspentOutputPrefix = []byte("UnspentOutput-")
+	coinbaseAmount      = 50
 )
 
 type Transaction struct {
@@ -306,14 +308,14 @@ func DecodeUnspentOutput(byteOutput []byte) *UnspentOutput {
 
 func GenerateUnspentOutputKey(address []byte) []byte {
 	return bytes.Join([][]byte{
-		[]byte("UnspentOutput-"),
+		UnspentOutputPrefix,
 		address,
 	}, []byte{})
 }
 
 func GenerateMemPoolTransactionKey(hash []byte) []byte {
 	return bytes.Join([][]byte{
-		[]byte("MemPool-"),
+		MemPoolPrefix,
 		hash,
 	}, []byte{})
 }

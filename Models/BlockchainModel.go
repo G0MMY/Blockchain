@@ -25,7 +25,6 @@ type BlockchainIterator struct {
 	DB          *leveldb.DB
 }
 
-//modify test to handle return nil
 func InitTestBlockchain(privateKey []byte) *Blockchain {
 	if !IsValidPrivateKey(privateKey) {
 		log.Println("Invalid private key")
@@ -92,10 +91,6 @@ func InitBlockchain(port string) *Blockchain {
 
 		return &Blockchain{lastHash, db}
 	}
-	//g, _ := hex.DecodeString("30770201010420087f1ddcfe6274bf1f49462e81a93c4e96dff5abffa6c266cd03284876d4ba49a00a06082a8648ce3d030107a14403420004f16f847f0c204bc36a6a3184f9b11f4b508999f52db0732120d20a97b27146d25c63162cd3ed22e4454989ed5a2752fc51c31f9865b9f43cec7dac3768f987eb")
-	//block := CreateGenesisBlock(g)
-	//blockchain := &Blockchain{[]byte{}, db}
-	//blockchain.AddBlock(block)
 
 	return &Blockchain{nil, db}
 }
@@ -417,7 +412,7 @@ func (blockchain *Blockchain) GetAllUnspentOutputsHash() []byte {
 	var read *opt.ReadOptions
 	var byteOutputs [][]byte
 
-	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("UnspentOutput-")), read)
+	iter := blockchain.DB.NewIterator(util.BytesPrefix(UnspentOutputPrefix), read)
 
 	for iter.Next() {
 		byteUnspentOutput := iter.Value()
@@ -435,7 +430,7 @@ func (blockchain *Blockchain) GetAllUnspentOutputs() map[string]*UnspentOutput {
 	var read *opt.ReadOptions
 	unspentOutputs := make(map[string]*UnspentOutput)
 
-	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("UnspentOutput-")), read)
+	iter := blockchain.DB.NewIterator(util.BytesPrefix(UnspentOutputPrefix), read)
 
 	for iter.Next() {
 		byteUnspentOutput := iter.Value()
@@ -453,7 +448,7 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 	var read *opt.ReadOptions
 	var transactions []*Transaction
 
-	iter := blockchain.DB.NewIterator(util.BytesPrefix([]byte("MemPool-")), read)
+	iter := blockchain.DB.NewIterator(util.BytesPrefix(MemPoolPrefix), read)
 
 	for iter.Next() {
 		byteTransaction := iter.Value()
@@ -467,6 +462,30 @@ func (blockchain *Blockchain) GetMemPoolTransactions() []*Transaction {
 	iter.Release()
 
 	return transactions
+}
+
+func (blockchain *Blockchain) Delete(prefix []byte) bool {
+	var read *opt.ReadOptions
+	var write *opt.WriteOptions
+	var deleteKeys [][]byte
+
+	iter := blockchain.DB.NewIterator(util.BytesPrefix(prefix), read)
+
+	for iter.Next() {
+		deleteKeys = append(deleteKeys, iter.Key())
+	}
+	iter.Release()
+
+	for _, key := range deleteKeys {
+		err := blockchain.DB.Delete(key, write)
+
+		if err != nil {
+			log.Println(err)
+			return false
+		}
+	}
+
+	return true
 }
 
 func (blockchain *Blockchain) DownloadMemPool(transactions []*Transaction) {

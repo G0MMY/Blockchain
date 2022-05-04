@@ -29,15 +29,28 @@ type FullNode struct {
 	Blockchain *Models.Blockchain
 }
 
-func InitializeNode(port string, allNodes []string) {
+func InitializeNode(port, neighbor string) {
+	allNodes := getNetwork(neighbor)
+	for i, node := range allNodes {
+		if node == port {
+			allNodes = append(allNodes[:i], allNodes[i+1:]...)
+		}
+	}
 	node := &FullNode{allNodes, port, []string{}, nil}
 
 	node.Blockchain = Models.InitBlockchain(port)
 	if node.Blockchain == nil {
 		return
 	} else if node.Blockchain.LastHash == nil {
-		if !node.getBlockchain() {
+		if !node.getBlockchain(nil) {
 			return
+		}
+	} else if allNodes != nil {
+		lastHash := node.initializeLastHash()
+		if lastHash != fmt.Sprintf("%x", node.Blockchain.LastHash) {
+			if !node.updateBlockchain(node.Blockchain.LastHash) {
+				return
+			}
 		}
 	}
 	node.initializeAllNodes()
@@ -122,6 +135,17 @@ func createTransactionWorker(createTransaction <-chan Models.TransactionRequest,
 	}
 }
 
+func (node *FullNode) updateBlockchain(currentLastHash []byte) bool {
+	node.Blockchain.LastHash = nil
+	if !node.Blockchain.Delete(Models.MemPoolPrefix) || !node.Blockchain.Delete(Models.UnspentOutputPrefix) {
+		return false
+	} else if !node.getBlockchain(currentLastHash) {
+		return false
+	}
+
+	return true
+}
+
 func (node *FullNode) addMiner(miner string) {
 	memPool := node.Blockchain.GetMemPoolTransactions()
 	lastBlock := node.Blockchain.GetLastBlock()
@@ -138,6 +162,18 @@ func (node *FullNode) addMiner(miner string) {
 	}
 
 	node.Miners = append(node.Miners, miner)
+}
+
+func getNetwork(neighbor string) []string {
+	if neighbor == "" {
+		return nil
+	}
+
+	var node FullNode
+	byteNetwork := Models.ExecuteGet("http://localhost:" + neighbor + "/network")
+	json.Unmarshal(byteNetwork, &node)
+
+	return node.AllNodes
 }
 
 func (node *FullNode) createTransaction(transactionRequest Models.TransactionRequest) {
@@ -267,12 +303,12 @@ func (node *FullNode) initializeAllNodes() {
 	node.AllNodes = append(node.AllNodes, node.Address)
 }
 
-func (node *FullNode) getBlockchain() bool {
+func (node *FullNode) getBlockchain(currentLastHash []byte) bool {
 	lastHash := node.initializeLastHash()
 	if lastHash == "" {
 		return false
 	}
-	if !node.initializeBlocks(lastHash) {
+	if !node.initializeBlocks(lastHash, currentLastHash) {
 		return false
 	}
 	if !node.initializeUnspentOutputs() {
@@ -380,7 +416,7 @@ func (node *FullNode) initializeUnspentOutputs() bool {
 	return true
 }
 
-func (node *FullNode) initializeBlocks(lastHash string) bool {
+func (node *FullNode) initializeBlocks(lastHash string, currentLastHash []byte) bool {
 	neighbor := rand.Intn(len(node.AllNodes))
 	body := Models.ExecuteGet("http://localhost:" + node.AllNodes[neighbor] + "/block/" + lastHash)
 	if body == nil {
@@ -400,8 +436,15 @@ func (node *FullNode) initializeBlocks(lastHash string) bool {
 	lastBlock := block
 	node.Blockchain.PersistBlock(block)
 
+	var compare []byte
+	if currentLastHash == nil {
+		compare = []byte{}
+	} else {
+		compare = currentLastHash
+	}
+
 	for true {
-		if bytes.Compare(blockRequest.PreviousHash, []byte{}) == 0 {
+		if bytes.Compare(blockRequest.PreviousHash, compare) == 0 {
 			break
 		}
 

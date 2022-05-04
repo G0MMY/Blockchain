@@ -109,6 +109,8 @@ func (handler *HandlerNode) CreateBlock(w http.ResponseWriter, r *http.Request) 
 	}
 	defer r.Body.Close()
 
+	fmt.Printf("Creating new block id: %d, nonce: %d, merkle root: %x, previous hash: %x \n\n", body.Index, body.Nonce, body.MerkleRoot, body.PreviousHash)
+
 	CreateBlock <- body
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -126,6 +128,8 @@ func (handler *HandlerNode) AddBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
+
+	fmt.Printf("Adding new block id: %d, nonce: %d, merkle root: %x, previous hash: %x \n\n", body.Index, body.Nonce, body.MerkleRoot, body.PreviousHash)
 
 	AddBlock <- body
 	w.Header().Add("Content-Type", "application/json")

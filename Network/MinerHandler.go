@@ -3,6 +3,7 @@ package Network
 import (
 	"blockchain/Models"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -17,6 +18,8 @@ func (handler *HandlerMiner) MineBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
+
+	fmt.Printf("Mining block id: %d with block hash: %x \n\n", body.LastIndex, body.Hash)
 
 	Stop <- body.LastIndex
 	MineBlock <- body

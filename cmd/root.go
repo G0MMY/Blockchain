@@ -1,53 +1,55 @@
 package cmd
 
 import (
+	"blockchain/Network"
+	"encoding/hex"
 	"fmt"
 	"github.com/spf13/cobra"
 	"os"
-
-	homedir "github.com/mitchellh/go-homedir"
-	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var port string
+var neighbor string
+var node string
+var privateKey string
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "blockchain",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "A simple blockchain",
+	Long:  `Blockchain is a simple blockchain that I did to learn about Golang and blockchains.`,
+}
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+var nodeCmd = &cobra.Command{
+	Use:   "node",
+	Short: "Initialize a node",
+	Long:  `Node is to initialize a new node. You will have to pass the port of the node.`,
+
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Hello 123")
+		port, _ := cmd.Flags().GetString("port")
+		neighbor, _ := cmd.Flags().GetString("neighbor")
+
+		Network.InitializeNode(port, neighbor)
 	},
 }
 
-var test = &cobra.Command{
-	Use:   "blockchain",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+var minerCmd = &cobra.Command{
+	Use:   "miner",
+	Short: "Initialize a miner",
+	Long:  `Miner is to initialize a new miner. You will have to pass the port of the miner.`,
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("test")
+		port, _ := cmd.Flags().GetString("port")
+		node, _ := cmd.Flags().GetString("node")
+		privateKey, _ := cmd.Flags().GetString("privateKey")
+		bytePrivateKey, _ := hex.DecodeString(privateKey)
+
+		Network.InitializeMiner(port, node, bytePrivateKey)
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	rootCmd.AddCommand(test)
+	rootCmd.AddCommand(nodeCmd)
+	rootCmd.AddCommand(minerCmd)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -55,41 +57,14 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	nodeCmd.PersistentFlags().StringVar(&port, "port", "", "The port that the node will run on")
+	nodeCmd.PersistentFlags().StringVar(&neighbor, "neighbor", "", "A known node to get the current network of the blockchain")
+	nodeCmd.MarkPersistentFlagRequired("port")
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.blockchain.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".blockchain" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".blockchain")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
+	minerCmd.PersistentFlags().StringVar(&port, "port", "", "The port that the miner will run on")
+	minerCmd.PersistentFlags().StringVar(&node, "node", "", "The port of the node that the miner will talk to")
+	minerCmd.PersistentFlags().StringVar(&privateKey, "privateKey", "", "The private key of the miner to receive the money for mining blocks")
+	minerCmd.MarkPersistentFlagRequired("port")
+	minerCmd.MarkPersistentFlagRequired("node")
+	minerCmd.MarkPersistentFlagRequired("privateKey")
 }

@@ -31,6 +31,7 @@ func InitializeMiner(port string, node string, privateKey []byte) {
 		log.Println("Bad node")
 		return
 	}
+
 	handler := NewMiner(miner)
 	router := mux.NewRouter()
 
@@ -103,7 +104,7 @@ func (miner *Miner) AddToNode(node string) bool {
 	}
 
 	body := bytes.NewBuffer(byteBody)
-	Models.ExecutePost("http://localhost:"+node+"/add/miner", body)
+	go Models.ExecutePost("http://localhost:"+node+"/add/miner", body)
 
 	return true
 }
