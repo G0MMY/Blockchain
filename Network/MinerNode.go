@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"time"
 )
 
 var (
@@ -70,7 +69,6 @@ func (miner *Miner) mine(block *Models.Block) bool {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-Models.Difficulty))
 
-	time.Sleep(5 * time.Second)
 	for {
 		select {
 		case index := <-Stop:

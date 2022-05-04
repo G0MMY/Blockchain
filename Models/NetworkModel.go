@@ -2,6 +2,7 @@ package Models
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -51,6 +52,18 @@ type MineBlockRequest struct {
 	LastIndex           int
 	Hash                []byte
 	MemPoolTransactions []*Transaction
+}
+
+func (transactionRequest CreateTransactionRequest) AddToNode(port string) {
+	byteBody, err := json.Marshal(transactionRequest)
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	body := bytes.NewBuffer(byteBody)
+	ExecutePost("http://localhost:"+port+"/add/transaction", body)
 }
 
 func (request UnspentOutputsRequest) CreateUnspentOutput() *UnspentOutput {

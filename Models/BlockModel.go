@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	Difficulty = 14
+	Difficulty = 20
 )
 
 type Block struct {

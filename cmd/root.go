@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"blockchain/Models"
 	"blockchain/Network"
 	"encoding/hex"
 	"fmt"
@@ -12,11 +13,40 @@ var port string
 var neighbor string
 var node string
 var privateKey string
+var to string
+var amount int
+var fee int
+var timestamp int
 
 var rootCmd = &cobra.Command{
 	Use:   "blockchain",
 	Short: "A simple blockchain",
 	Long:  `Blockchain is a simple blockchain that I did to learn about Golang and blockchains.`,
+}
+
+var transactionCmd = &cobra.Command{
+	Use:   "transaction",
+	Short: "Create a new transaction",
+	Long:  "Transaction is to create a new transaction on the blockchain.",
+
+	Run: func(cmd *cobra.Command, args []string) {
+		node, _ := cmd.Flags().GetString("node")
+		privateKey, _ := cmd.Flags().GetString("privateKey")
+		to, _ := cmd.Flags().GetString("receiver")
+		amount, _ := cmd.Flags().GetInt("amount")
+		fee, _ := cmd.Flags().GetInt("fee")
+		timestamp, _ := cmd.Flags().GetInt("timestamp")
+
+		transactionRequest := Models.CreateTransactionRequest{
+			privateKey,
+			to,
+			amount,
+			fee,
+			int64(timestamp),
+		}
+
+		transactionRequest.AddToNode(node)
+	},
 }
 
 var nodeCmd = &cobra.Command{
@@ -50,6 +80,7 @@ var minerCmd = &cobra.Command{
 func Execute() {
 	rootCmd.AddCommand(nodeCmd)
 	rootCmd.AddCommand(minerCmd)
+	rootCmd.AddCommand(transactionCmd)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -67,4 +98,17 @@ func init() {
 	minerCmd.MarkPersistentFlagRequired("port")
 	minerCmd.MarkPersistentFlagRequired("node")
 	minerCmd.MarkPersistentFlagRequired("privateKey")
+
+	transactionCmd.PersistentFlags().StringVar(&node, "node", "", "The port of the node that the transaction will be sent to")
+	transactionCmd.PersistentFlags().StringVar(&privateKey, "privateKey", "", "The private key of the sender of the transaction")
+	transactionCmd.PersistentFlags().StringVar(&to, "receiver", "", "The address or the public key of the receiver of the transaction")
+	transactionCmd.PersistentFlags().IntVar(&amount, "amount", 0, "The amount of the transaction")
+	transactionCmd.PersistentFlags().IntVar(&fee, "fee", 0, "The fee of the transaction")
+	transactionCmd.PersistentFlags().IntVar(&timestamp, "timestamp", 0, "The timestamp of the transaction (when it can be accepted in the blockchain)")
+	transactionCmd.MarkPersistentFlagRequired("node")
+	transactionCmd.MarkPersistentFlagRequired("privateKey")
+	transactionCmd.MarkPersistentFlagRequired("receiver")
+	transactionCmd.MarkPersistentFlagRequired("amount")
+	transactionCmd.MarkPersistentFlagRequired("fee")
+	transactionCmd.MarkPersistentFlagRequired("timestamp")
 }
