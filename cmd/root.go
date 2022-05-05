@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/spf13/cobra"
+	"log"
 	"os"
 )
 
@@ -22,6 +23,21 @@ var rootCmd = &cobra.Command{
 	Use:   "blockchain",
 	Short: "A simple blockchain",
 	Long:  `Blockchain is a simple blockchain that I did to learn about Golang and blockchains.`,
+}
+
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Init the blockchain",
+	Long:  "Init will open a new database and initialize the blockchain. Use this command for the first time starting the blockchain.",
+	Run: func(cmd *cobra.Command, args []string) {
+		port, _ := cmd.Flags().GetString("port")
+
+		log.Println("Mining first block!")
+		if !Models.StartBlockchain(port) {
+			return
+		}
+		Network.InitializeNode(port, "")
+	},
 }
 
 var transactionCmd = &cobra.Command{
@@ -81,6 +97,7 @@ func Execute() {
 	rootCmd.AddCommand(nodeCmd)
 	rootCmd.AddCommand(minerCmd)
 	rootCmd.AddCommand(transactionCmd)
+	rootCmd.AddCommand(initCmd)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -111,4 +128,7 @@ func init() {
 	transactionCmd.MarkPersistentFlagRequired("amount")
 	transactionCmd.MarkPersistentFlagRequired("fee")
 	transactionCmd.MarkPersistentFlagRequired("timestamp")
+
+	initCmd.PersistentFlags().StringVar(&port, "port", "", "The port that the node will run on")
+	initCmd.MarkPersistentFlagRequired("port")
 }

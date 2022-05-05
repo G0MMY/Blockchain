@@ -95,6 +95,25 @@ func InitBlockchain(port string) *Blockchain {
 	return &Blockchain{nil, db}
 }
 
+func StartBlockchain(port string) bool {
+	db, err := leveldb.OpenFile("./db"+port, nil)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+
+	block := CreateGenesisBlock(CreateWallet().PrivateKey)
+	if block == nil {
+		return false
+	}
+
+	blockchain := &Blockchain{[]byte{}, db}
+	blockchain.AddBlock(block)
+	blockchain.DB.Close()
+
+	return true
+}
+
 func (blockchain *Blockchain) ValidateBlockchain() bool {
 	blockchainIterator := &BlockchainIterator{blockchain.LastHash, blockchain.DB}
 	return blockchainIterator.validateBlockchain()
